@@ -115,6 +115,12 @@ const SidebarProvider = React.forwardRef<
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed"
+    
+    // Defer rendering of the sidebar on the server to prevent hydration errors.
+    const [isClient, setIsClient] = React.useState(false)
+    React.useEffect(() => {
+        setIsClient(true)
+    }, [])
 
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
@@ -147,7 +153,7 @@ const SidebarProvider = React.forwardRef<
             ref={ref}
             {...props}
           >
-            {children}
+            {isClient ? children : null}
           </div>
         </TooltipProvider>
       </SidebarContext.Provider>
@@ -764,5 +770,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    
