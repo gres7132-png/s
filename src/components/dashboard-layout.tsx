@@ -215,7 +215,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center justify-between lg:justify-end border-b px-4 lg:px-6">
-          <SidebarTrigger className="lg:hidden" />
+          <SidebarTrigger className="lg:hidden h-10 w-10 [&>svg]:h-6 [&>svg]:w-6" />
           <UserProfileNav />
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
