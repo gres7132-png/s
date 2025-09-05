@@ -60,7 +60,6 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Control Panel</h1>
-        <Button variant="outline">Return to Official Website</Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
