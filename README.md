@@ -1,4 +1,6 @@
 
+git add .
+
 
 # Firebase Studio
 
