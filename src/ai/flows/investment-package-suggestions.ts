@@ -1,59 +1,128 @@
-'use server';
+"use client";
 
-/**
- * @fileOverview Suggests investment packages based on user profile and investment history.
- *
- * - suggestInvestmentPackages - A function that suggests investment packages.
- * - SuggestInvestmentPackagesInput - The input type for the suggestInvestmentPackages function.
- * - SuggestInvestmentPackagesOutput - The return type for the suggestInvestmentPackages function.
- */
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAuth } from "@/hooks/use-auth";
+import { formatCurrency } from "@/lib/utils";
+import {
+  Activity,
+  AlertOctagon,
+  ArrowDown,
+  ArrowUp,
+  DollarSign,
+} from "lucide-react";
+import LatestTransactions from "@/components/latest-transactions";
+import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const SuggestInvestmentPackagesInputSchema = z.object({
-  userProfile: z
-    .string()
-    .describe('The profile of the user, including investment history.'),
-});
-export type SuggestInvestmentPackagesInput = z.infer<
-  typeof SuggestInvestmentPackagesInputSchema
->;
-
-const SuggestInvestmentPackagesOutputSchema = z.object({
-  suggestedPackages: z
-    .array(z.string())
-    .describe('Suggested investment packages for the user.'),
-});
-export type SuggestInvestmentPackagesOutput = z.infer<
-  typeof SuggestInvestmentPackagesOutputSchema
->;
-
-export async function suggestInvestmentPackages(
-  input: SuggestInvestmentPackagesInput
-): Promise<SuggestInvestmentPackagesOutput> {
-  return suggestInvestmentPackagesFlow(input);
+interface UserStats {
+  availableBalance: number;
+  todaysEarnings: number;
+  rechargeAmount: number;
+  withdrawalAmount: number;
 }
 
-const prompt = ai.definePrompt({
-  name: 'suggestInvestmentPackagesPrompt',
-  input: {schema: SuggestInvestmentPackagesInputSchema},
-  output: {schema: SuggestInvestmentPackagesOutputSchema},
-  prompt: `You are an investment advisor. Based on the user profile and investment history provided, suggest investment packages that would be suitable for the user.
+export default function DashboardPage() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    if (user) {
+      // --- Backend Data Fetching Placeholder ---
+      const fetchStats = async () => {
+        setLoading(true);
+        // In a real application, you would fetch this data from your backend.
+        // Example: const userStats = await getStatsForUser(user.uid);
+        
+        // const mockStats: UserStats = {
+        //   availableBalance: 52340,
+        //   todaysEarnings: 166,
+        //   rechargeAmount: 1300,
+        //   withdrawalAmount: 0,
+        // };
+        // setStats(mockStats);
+        
+        setLoading(false);
+      };
+      fetchStats();
+    }
+  }, [user]);
 
-User Profile and Investment History: {{{userProfile}}}
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Control Panel</h1>
+      </div>
 
-Suggest investment packages:`,
-});
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  {loading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{formatCurrency(stats?.availableBalance ?? 0)}</div>}
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Today's Earnings</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                   {loading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{formatCurrency(stats?.todaysEarnings ?? 0)}</div>}
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Recharge Amount</CardTitle>
+                  <ArrowUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                   {loading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{formatCurrency(stats?.rechargeAmount ?? 0)}</div>}
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Withdrawal Amount</CardTitle>
+                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                   {loading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{formatCurrency(stats?.withdrawalAmount ?? 0)}</div>}
+              </CardContent>
+          </Card>
+        </div>
 
-const suggestInvestmentPackagesFlow = ai.defineFlow(
-  {
-    name: 'suggestInvestmentPackagesFlow',
-    inputSchema: SuggestInvestmentPackagesInputSchema,
-    outputSchema: SuggestInvestmentPackagesOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertOctagon className="h-5 w-5" />
+              Notification
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-xs text-muted-foreground">
+            <p>
+              1: After waiting for 24 hours, you can withdraw the income from purchasing company products, and you can withdraw cash immediately without any requirements.
+            </p>
+            <p>
+              2: The company's withdrawal fee needs to deduct 10% tax, because the company is an American company and needs to pay taxes to the United States. However, the company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
+            </p>
+            <p>
+              3: You only need to have one account in the company, and multiple accounts are not allowed. The system will automatically block members with multiple accounts.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <LatestTransactions />
+    </div>
+  );
+}

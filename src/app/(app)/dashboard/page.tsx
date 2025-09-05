@@ -18,7 +18,7 @@ import {
   ArrowUp,
   DollarSign,
 } from "lucide-react";
-import AiSuggestions from "@/components/ai-suggestions";
+import LatestTransactions from "@/components/latest-transactions";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -123,7 +123,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <AiSuggestions />
+      <LatestTransactions />
     </div>
   );
 }
