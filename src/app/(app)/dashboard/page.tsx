@@ -62,8 +62,8 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">Control Panel</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Available Balance</CardTitle>

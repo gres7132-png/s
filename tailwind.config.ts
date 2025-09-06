@@ -90,10 +90,11 @@ export default {
         },
       },
       animation: {
-        'accordion-down': 'accordion-down 0.15s ease-out',
-        'accordion-up': 'accordion-up 0.15s ease-out',
+        'accordion-down': 'accordion-down 0.1s ease-out',
+        'accordion-up': 'accordion-up 0.1s ease-out',
       },
       transitionDuration: {
+        '100': '100ms',
         '150': '150ms',
       }
     },
