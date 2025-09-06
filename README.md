@@ -1,6 +1,6 @@
 
 git remote add origin https://github.com/gres7132-png/s.git
-git remote add origin https://github.com/gres7132-png/s.git
+git add .
 
 
 # Firebase Studio
