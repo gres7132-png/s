@@ -119,12 +119,8 @@ function UserProfileNav() {
 
     if (loading) {
         return (
-            <div className="flex items-center gap-2 p-2">
+            <div className="flex items-center gap-2">
                 <Skeleton className="h-9 w-9 rounded-full" />
-                <div className="flex flex-col gap-1">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-3 w-32" />
-                </div>
             </div>
         )
     }
@@ -196,7 +192,6 @@ function UserInfo() {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
   return (
     <SidebarProvider>
       <Sidebar>
@@ -208,7 +203,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
             <SidebarGroup>
-                {user && <UserInfo />}
+                <UserInfo />
             </SidebarGroup>
           <NavMenu />
         </SidebarContent>

@@ -25,21 +25,6 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
 });
 
-// Loading component to show while we check for authentication state
-function AuthLoading() {
-    return (
-        <div className="flex h-screen items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -54,35 +39,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(user);
         // Check if the logged-in user's email is in the admin list
         setIsAdmin(ADMIN_EMAILS.includes(user.email || ""));
+        if (isAuthPage) {
+          router.push('/dashboard');
+        }
       } else {
         setUser(null);
         setIsAdmin(false);
+        if (!isAuthPage) {
+          router.push("/auth");
+        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isAuthPage, router]);
 
-  useEffect(() => {
-    if (!loading) {
-      if (user && isAuthPage) {
-        router.push('/dashboard');
-      } else if (!user && !isAuthPage) {
-        router.push("/auth");
-      }
-    }
-  }, [user, loading, isAuthPage, router]);
+  const value = { user, loading, auth, isAdmin };
 
-  if (loading && !isAuthPage) {
-      return <AuthLoading />;
-  }
-  
-  if ((!loading && user) || isAuthPage) {
-      return <AuthContext.Provider value={{ user, loading, auth, isAdmin }}>{children}</AuthContext.Provider>;
-  }
-
-  return null;
+  // Render children immediately for a faster perceived load.
+  // The redirects inside the useEffect will handle routing logic.
+  return (
+      <AuthContext.Provider value={value}>
+        {children}
+      </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
