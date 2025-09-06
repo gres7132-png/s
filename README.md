@@ -1,7 +1,9 @@
+# YieldLink Project
 
-git remote set-url origin https://github.com/gres7132-png/ss.git
-git add .
+This project is hosted on GitHub at:
+[https://github.com/gres7132-png/ss](https://github.com/gres7132-png/ss)
 
+---
 
 # Firebase Studio
 
