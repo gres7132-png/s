@@ -1,5 +1,5 @@
 
-git remote add origin https://github.com/gres7132-png/s.git
+git remote set-url origin https://github.com/gres7132-png/ss.git
 git add .
 
 
