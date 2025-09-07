@@ -61,6 +61,7 @@ export default function DistributorPage() {
             setLoading(true);
             // Example: const data = await getDistributorData(user.uid);
             
+            // This component will now start with no data, waiting for the real fetch.
             // const mockData: DistributorData = {
             //     referredUsersCount: 5,
             //     userBalance: 52340,

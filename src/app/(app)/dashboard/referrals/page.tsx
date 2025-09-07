@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { Copy } from "lucide-react";
+import { Copy, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -37,21 +37,22 @@ export default function ReferralsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState("");
-  
-  // This state will hold the list of users referred by the current user.
-  // In a real application, you would fetch this data from your backend (e.g., Firestore).
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
       
       // --- Backend Data Fetching Placeholder ---
-      // const fetchReferredUsers = async () => {
-      //   // Example: const users = await getReferredUsers(user.uid);
-      //   // setReferredUsers(users);
-      // };
-      // fetchReferredUsers();
+      const fetchReferredUsers = async () => {
+        setLoading(true);
+        // Example: const users = await getReferredUsers(user.uid);
+        // setReferredUsers(users);
+        setReferredUsers([]); // A new user starts with an empty list of referrals.
+        setLoading(false);
+      };
+      fetchReferredUsers();
     }
   }, [user]);
 
@@ -120,7 +121,13 @@ export default function ReferralsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {referredUsers.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ) : referredUsers.length > 0 ? (
                 referredUsers.map((refUser) => (
                   <TableRow key={refUser.id}>
                     <TableCell className="font-medium">{refUser.name}</TableCell>

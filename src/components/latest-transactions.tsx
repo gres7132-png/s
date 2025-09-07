@@ -13,16 +13,6 @@ import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// In a real application, you would fetch this data from your backend.
-// This is mock data for demonstration purposes.
-const mockTransactions = [
-    { type: 'Deposit', user: 'User...4a2b', amount: 2800, time: '1 min ago' },
-    { type: 'Withdrawal', user: 'User...f8c1', amount: 39000, time: '3 mins ago' },
-    { type: 'Deposit', user: 'User...3e9d', amount: 1300, time: '5 mins ago' },
-    { type: 'Deposit', user: 'User...c5a7', amount: 9750, time: '8 mins ago' },
-    { type: 'Withdrawal', user: 'User...b1e6', amount: 65000, time: '12 mins ago' },
-];
-
 interface Transaction {
     type: 'Deposit' | 'Withdrawal';
     user: string;
@@ -36,12 +26,17 @@ export default function LatestTransactions() {
 
   useEffect(() => {
     // Simulate fetching data from a backend API
-    const timer = setTimeout(() => {
-      setTransactions(mockTransactions);
+    const fetchTransactions = async () => {
+      setLoading(true);
+      // In a real application, you would fetch this data from your backend.
+      // e.g., const fetchedTransactions = await getLiveTransactions();
+      // setTransactions(fetchedTransactions);
+      setTransactions([]); // Start with an empty list.
       setLoading(false);
-    }, 1500); // Simulate a network delay
+    };
+    
+    fetchTransactions();
 
-    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -64,6 +59,11 @@ export default function LatestTransactions() {
                  <Skeleton className="h-5 w-1/4" />
              </div>
           ))}
+          {!loading && transactions.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">
+              No recent transactions.
+            </p>
+          )}
           {!loading && transactions.map((tx, index) => (
             <div key={index} className="flex items-center gap-4">
               <div>

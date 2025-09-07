@@ -165,10 +165,12 @@ export default function WalletPage() {
     <div className="flex items-center justify-between gap-4 py-3 border-b border-border/50">
         <div>
             <p className="text-sm font-semibold text-foreground">{label}</p>
-            {value ? (
+            {isLoading ? (
+                <Skeleton className="h-5 w-48 mt-1" />
+            ) : value ? (
                 <p className="text-sm text-muted-foreground break-all font-bold">{value}</p>
             ) : (
-                <Skeleton className="h-5 w-48 mt-1" />
+                <p className="text-sm text-muted-foreground font-bold">-</p>
             )}
         </div>
         <Button 
@@ -177,7 +179,7 @@ export default function WalletPage() {
             className="flex-shrink-0"
             onClick={() => copyToClipboard(value, label)}
             aria-label={`Copy ${label}`}
-            disabled={!value}
+            disabled={!value || isLoading}
         >
             <Copy className="h-4 w-4" />
         </Button>

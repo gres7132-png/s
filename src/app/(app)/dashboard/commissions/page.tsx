@@ -20,11 +20,28 @@ import { formatCurrency } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Users } from "lucide-react";
 import { commissionTiers } from "@/lib/config";
-
-// In a real application, this would be determined by fetching data from the backend.
-const userActiveReferrals = 0; 
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function AgentCommissionsPage() {
+  const { user } = useAuth();
+  const [userActiveReferrals, setUserActiveReferrals] = useState(0);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    if (user) {
+      // --- Backend Fetching Placeholder ---
+      const fetchReferralCount = async () => {
+        setLoading(true);
+        // const count = await getActiveReferralCount(user.uid);
+        // setUserActiveReferrals(count);
+        setUserActiveReferrals(0); // A new user starts with 0 referrals.
+        setLoading(false);
+      }
+      fetchReferralCount();
+    }
+  }, [user]);
+  
   const currentCommission = commissionTiers
     .slice()
     .reverse()
@@ -45,7 +62,7 @@ export default function AgentCommissionsPage() {
             <CardTitle>YOUR ACTIVE REFERRALS</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{userActiveReferrals}</p>
+            <p className="text-4xl font-bold">{loading ? "..." : userActiveReferrals}</p>
           </CardContent>
         </Card>
         <Card>

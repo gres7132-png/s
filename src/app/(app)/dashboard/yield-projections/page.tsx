@@ -44,15 +44,7 @@ export default function YieldProjectionsPage() {
             // based on the user's current investments.
             // Example: const data = await getYieldProjections(user.uid);
             
-            // const mockData: ChartData[] = [
-            //     { month: "Jan", earnings: 186 },
-            //     { month: "Feb", earnings: 305 },
-            //     { month: "Mar", earnings: 237 },
-            //     { month: "Apr", earnings: 473 },
-            //     { month: "May", earnings: 300 },
-            //     { month: "Jun", earnings: 550 },
-            // ];
-            // setChartData(mockData);
+            setChartData([]); // A new user starts with no projection data.
             setLoading(false);
         };
         fetchProjections();

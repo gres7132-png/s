@@ -12,10 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { silverLevelPackages } from "@/lib/config";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { silverLevelPackages } from "@/lib/config";
 
 
 export default function InvestPage() {
@@ -32,7 +32,9 @@ export default function InvestPage() {
         setIsLoadingBalance(true);
         // Example: const balance = await getUserBalance(user.uid);
         
-        // setUserBalance(52340); // Mock balance
+        // In a real app, you would fetch the balance from your backend
+        // For now, we'll start with 0 until it's fetched.
+        setUserBalance(0); 
         setIsLoadingBalance(false);
       };
       fetchBalance();

@@ -42,13 +42,13 @@ export default function DashboardPage() {
         // In a real application, you would fetch this data from your backend.
         // Example: const userStats = await getStatsForUser(user.uid);
         
-        const mockStats: UserStats = {
-          availableBalance: 52340,
-          todaysEarnings: 166,
-          rechargeAmount: 1300,
-          withdrawalAmount: 0,
-        };
-        setStats(mockStats);
+        // const mockStats: UserStats = {
+        //   availableBalance: 52340,
+        //   todaysEarnings: 166,
+        //   rechargeAmount: 1300,
+        //   withdrawalAmount: 0,
+        // };
+        // setStats(mockStats);
         
         setLoading(false);
       };
