@@ -4,15 +4,15 @@
 import { useAuth } from "@/hooks/use-auth";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Users, List, Briefcase, Settings, ShieldAlert } from "lucide-react";
+import { Users, List, Briefcase, Settings, ShieldAlert, DollarSign, Gift } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from "next/link";
 
 export default function AdminPage() {
   const { isAdmin, loading } = useAuth();
@@ -34,6 +34,45 @@ export default function AdminPage() {
     );
   }
 
+  const adminSections = [
+    { 
+      href: "/dashboard/admin/investments", 
+      title: "Investment Packages", 
+      description: "Add or modify investment products.",
+      icon: Briefcase,
+    },
+    { 
+      href: "/dashboard/admin/distributor", 
+      title: "Distributor Tiers",
+      description: "Manage distributor levels and deposits.",
+      icon: Gift
+    },
+    {
+      href: "/dashboard/admin/commissions",
+      title: "Commission Tiers",
+      description: "Set agent commission levels.",
+      icon: DollarSign
+    },
+    {
+      href: "/dashboard/admin/settings",
+      title: "Site Settings",
+      description: "Update payment details and fees.",
+      icon: Settings
+    },
+    {
+        href: "#",
+        title: "Manage Users",
+        description: "View, edit, or suspend user accounts.",
+        icon: Users
+    },
+    {
+        href: "#",
+        title: "All Transactions",
+        description: "Review all deposits and withdrawals.",
+        icon: List
+    },
+  ];
+
   return (
     <div className="space-y-8">
       <div>
@@ -52,42 +91,19 @@ export default function AdminPage() {
       </Alert>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover:border-primary/50 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Manage Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">View, edit, or suspend user accounts.</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:border-primary/50 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">All Transactions</CardTitle>
-            <List className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Review all deposits and withdrawals.</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:border-primary/50 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Investment Packages</CardTitle>
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-           <CardContent>
-            <p className="text-xs text-muted-foreground">Add or modify investment products.</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:border-primary/50 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Site Settings</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-           <CardContent>
-            <p className="text-xs text-muted-foreground">Update payment details and fees.</p>
-          </CardContent>
-        </Card>
+        {adminSections.map((section) => (
+           <Link href={section.href} key={section.title}>
+            <Card className="hover:border-primary/50 hover:bg-muted/50 transition-all h-full">
+              <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+                <section.icon className="h-6 w-6 text-muted-foreground mt-1" />
+                <div className="space-y-1">
+                    <CardTitle className="text-base font-semibold">{section.title}</CardTitle>
+                    <CardDescription className="text-xs">{section.description}</CardDescription>
+                </div>
+              </CardHeader>
+            </Card>
+           </Link>
+        ))}
       </div>
     </div>
   );
