@@ -13,6 +13,7 @@ import {
   UserPlus,
   Gift,
   TrendingUp,
+  Shield,
 } from "lucide-react";
 
 import { signOut } from "firebase/auth";
@@ -31,6 +32,7 @@ import {
   useSidebar,
   SidebarGroup,
   SidebarFooter,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -57,11 +59,15 @@ const navItems = [
   { href: "/dashboard/commissions", icon: DollarSign, label: "Agent Commissions" },
 ];
 
+const adminNavItems = [
+    { href: "/dashboard/admin", icon: Shield, label: "Admin Panel" },
+];
+
 function NavMenu() {
   const pathname = usePathname();
   const { setOpenMobile, isMobile } = useSidebar();
   const router = useRouter();
-  const { auth } = useAuth();
+  const { auth, isAdmin } = useAuth();
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -92,6 +98,27 @@ function NavMenu() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         ))}
+        
+        {isAdmin && (
+            <>
+                <SidebarSeparator className="my-2" />
+                 {adminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={item.label}
+                      onClick={handleLinkClick}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+            </>
+        )}
       </SidebarMenu>
 
       <SidebarFooter className="mt-auto">
