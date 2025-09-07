@@ -4,6 +4,7 @@ This project is hosted on GitHub at:
 [https://github.com/gres7132-png/s](https://github.com/gres7132-png/s)
 
 ---
+git push origin main
 
 # Firebase Studio
 
