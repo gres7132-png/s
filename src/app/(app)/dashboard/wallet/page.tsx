@@ -80,6 +80,9 @@ export default function WalletPage() {
     resolver: zodResolver(bankingDetailsSchema),
     defaultValues: {
       paymentMethod: "mobile",
+      mobileNumber: "",
+      minipayNumber: "",
+      cryptoAddress: "",
     },
   });
 
@@ -131,10 +134,16 @@ export default function WalletPage() {
 
   const withdrawalForm = useForm<z.infer<typeof withdrawalSchema>>({
     resolver: zodResolver(withdrawalSchema),
+    defaultValues: {
+        amount: 0,
+    }
   });
 
   const depositForm = useForm<z.infer<typeof depositSchema>>({
     resolver: zodResolver(depositSchema),
+    defaultValues: {
+        transactionProof: "",
+    }
   });
 
   async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
