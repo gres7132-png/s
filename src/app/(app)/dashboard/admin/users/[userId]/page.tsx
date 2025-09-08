@@ -40,29 +40,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 
-// --- Mock Data ---
 // In a production app, this data would come from a secure backend API/Firebase Function
-const mockUsers: (Partial<FirebaseUser> & { disabled?: boolean })[] = [
-    { uid: 'user1', email: 'john.doe@example.com', displayName: 'John Doe', disabled: false },
-    { uid: 'user2', email: 'jane.smith@example.com', displayName: 'Jane Smith', disabled: false },
-    { uid: 'user3', email: 'suspended.user@example.com', displayName: 'Suspended User', disabled: true },
-];
-
-const mockReferrals = [
-    { id: 'ref1', name: 'Alice', capital: 5000, commission: 250, status: 'Active' },
-    { id: 'ref2', name: 'Bob', capital: 0, commission: 0, status: 'Pending' },
-];
-
-const mockTransactions = {
-    deposits: [
-        { id: 'dep1', amount: 1300, date: new Date(), status: 'approved' },
-    ],
-    withdrawals: [
-        { id: 'wd1', amount: 500, date: new Date(), status: 'pending' },
-    ]
-};
-// --- End Mock Data ---
-
+// The client-side SDK cannot list or edit all users directly.
 
 const profileSchema = z.object({
   displayName: z.string().min(1, "Full name is required."),
@@ -77,7 +56,11 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const { isAdmin, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  // State for user data, referrals, and transactions would be populated from your backend
   const [user, setUser] = useState<(Partial<FirebaseUser> & { disabled?: boolean }) | null>(null);
+  const [referrals, setReferrals] = useState([]);
+  const [transactions, setTransactions] = useState({ deposits: [], withdrawals: [] });
+
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -91,13 +74,18 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     if (userId) {
       setLoading(true);
       // --- Backend Fetching Placeholder ---
-      // const userData = await getUserDetails(userId);
-      const userData = mockUsers.find(u => u.uid === userId) || null;
-      setUser(userData);
-      form.reset({
-        displayName: userData?.displayName || "",
-        email: userData?.email || "",
-      });
+      // In a real app, you would make a secure call to your backend/Firebase Function here
+      // to get the user's details, their referrals, and their transaction history.
+      // const userData = await yourBackend.getUserDetails(userId);
+      // const referralData = await yourBackend.getUserReferrals(userId);
+      // const transactionData = await yourBackend.getUserTransactions(userId);
+      // setUser(userData);
+      // setReferrals(referralData);
+      // setTransactions(transactionData);
+      // form.reset({
+      //   displayName: userData?.displayName || "",
+      //   email: userData?.email || "",
+      // });
       setLoading(false);
     }
   }, [userId, form]);
@@ -106,7 +94,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     setLoading(true);
     try {
       // --- Backend Logic Placeholder ---
-      // await updateUserProfile(userId, values);
+      // await yourBackend.updateUserProfile(userId, values);
       console.log("Profile update for", userId, values);
       toast({
         title: "Profile Updated",
@@ -126,8 +114,8 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     try {
         // --- Backend Logic Placeholder ---
         // This would be a Firebase Function call to update the user's disabled state in Firebase Auth
-        // await toggleUserSuspension(user.uid, newStatus);
-        setUser(prev => prev ? {...prev, disabled: newStatus } : null);
+        // await yourBackend.toggleUserSuspension(user.uid, newStatus);
+        setUser(prev => prev ? {...prev, disabled: newStatus } : null); // Optimistic update
         toast({
             title: `User ${newStatus ? 'Suspended' : 'Reactivated'}`,
             description: `${user.displayName} has been ${newStatus ? 'suspended' : 'reactivated'}.`
@@ -153,7 +141,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   }
 
   if (!user) {
-     return <div className="text-center">User not found.</div>;
+     return <div className="text-center pt-8">User not found or data could not be loaded.</div>;
   }
 
   return (
@@ -230,13 +218,13 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                             <Table>
                                 <TableHeader><TableRow><TableHead>User Name</TableHead><TableHead>Invested</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {mockReferrals.map(r => (
+                                    {referrals.length > 0 ? referrals.map((r: any) => (
                                         <TableRow key={r.id}>
                                             <TableCell>{r.name}</TableCell>
                                             <TableCell>{formatCurrency(r.capital)}</TableCell>
                                             <TableCell><Badge variant={r.status === 'Active' ? 'default' : 'secondary'}>{r.status}</Badge></TableCell>
                                         </TableRow>
-                                    ))}
+                                    )) : <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No referrals found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </TabsContent>
@@ -244,13 +232,13 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                              <Table>
                                 <TableHeader><TableRow><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {mockTransactions.deposits.map(t => (
+                                    {transactions.deposits.length > 0 ? transactions.deposits.map((t: any) => (
                                         <TableRow key={t.id}>
                                             <TableCell>{formatCurrency(t.amount)}</TableCell>
                                             <TableCell>{t.date.toLocaleDateString()}</TableCell>
                                             <TableCell><Badge>{t.status}</Badge></TableCell>
                                         </TableRow>
-                                    ))}
+                                    )) : <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No deposits found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </TabsContent>
@@ -258,13 +246,13 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                              <Table>
                                 <TableHeader><TableRow><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {mockTransactions.withdrawals.map(t => (
+                                     {transactions.withdrawals.length > 0 ? transactions.withdrawals.map((t: any) => (
                                         <TableRow key={t.id}>
                                             <TableCell>{formatCurrency(t.amount)}</TableCell>
                                             <TableCell>{t.date.toLocaleDateString()}</TableCell>
                                             <TableCell><Badge variant="secondary">{t.status}</Badge></TableCell>
                                         </TableRow>
-                                    ))}
+                                    )): <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No withdrawals found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </TabsContent>

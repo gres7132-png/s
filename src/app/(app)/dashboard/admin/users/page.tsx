@@ -25,15 +25,6 @@ import { Loader2, ShieldAlert, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { User } from "firebase/auth";
 
-// --- Mock User Data ---
-// In a production app, this data would come from a secure backend API/Firebase Function
-// that can list all Firebase Auth users. Client-side SDKs cannot list users for security reasons.
-const mockUsers: (Partial<User> & { disabled?: boolean })[] = [
-    { uid: 'user1', email: 'john.doe@example.com', displayName: 'John Doe', disabled: false },
-    { uid: 'user2', email: 'jane.smith@example.com', displayName: 'Jane Smith', disabled: false },
-    { uid: 'user3', email: 'suspended.user@example.com', displayName: 'Suspended User', disabled: true },
-];
-
 export default function UsersListPage() {
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
@@ -46,9 +37,11 @@ export default function UsersListPage() {
     const fetchUsers = async () => {
         setLoading(true);
         // --- Backend Fetching Placeholder ---
-        // const fetchedUsers = await listAllUsers(); // This would be a call to a Firebase Function
+        // In a production app, this data would come from a secure backend API/Firebase Function
+        // that can list all Firebase Auth users. Client-side SDKs cannot list users for security reasons.
+        // const fetchedUsers = await yourBackend.listAllUsers();
         // setUsers(fetchedUsers);
-        setUsers(mockUsers);
+        setUsers([]); // Initialize with no users
         setLoading(false);
     };
 
@@ -126,7 +119,7 @@ export default function UsersListPage() {
               ) : (
                 <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No users found.
+                        No users found. Connect to a backend to list users.
                     </TableCell>
                 </TableRow>
               )}
