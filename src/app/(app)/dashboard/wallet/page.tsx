@@ -35,10 +35,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, DollarSign, Link as LinkIcon } from "lucide-react";
+import { Copy, DollarSign, Link as LinkIcon, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
+import { db } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 
 interface UserWalletData {
@@ -50,6 +52,7 @@ export default function WalletPage() {
   const { user } = useAuth();
   const [walletData, setWalletData] = useState<UserWalletData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmittingProof, setIsSubmittingProof] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -137,13 +140,41 @@ export default function WalletPage() {
     });
   }
 
-  function onDepositSubmit(values: z.infer<typeof depositSchema>) {
-    console.log("Deposit proof submitted:", values);
-    toast({
-      title: "Proof Submitted",
-      description: "Your deposit is being verified and will reflect in your account shortly.",
-    });
-    depositForm.reset();
+  async function onDepositSubmit(values: z.infer<typeof depositSchema>) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Not Authenticated",
+            description: "You must be logged in to submit proof.",
+        });
+        return;
+    }
+    
+    setIsSubmittingProof(true);
+    try {
+        await addDoc(collection(db, "transactionProofs"), {
+            userId: user.uid,
+            userName: user.displayName || 'Unknown User',
+            proof: values.transactionProof,
+            submittedAt: serverTimestamp(),
+            status: 'pending', // Initial status
+        });
+
+        toast({
+          title: "Proof Submitted",
+          description: "Your deposit is being verified and will reflect in your account shortly.",
+        });
+        depositForm.reset();
+    } catch (error) {
+        console.error("Error submitting proof:", error);
+        toast({
+            variant: "destructive",
+            title: "Submission Failed",
+            description: "Could not submit your proof. Please try again.",
+        });
+    } finally {
+        setIsSubmittingProof(false);
+    }
   }
 
   const selectedPaymentMethod = bankingDetailsForm.watch("paymentMethod");
@@ -244,6 +275,7 @@ export default function WalletPage() {
                                             placeholder="Paste the transaction hash, ID, or confirmation code here."
                                             className="resize-none"
                                             {...field}
+                                            disabled={isSubmittingProof}
                                         />
                                     </FormControl>
                                     <FormDescription>
@@ -253,7 +285,9 @@ export default function WalletPage() {
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Submit Proof</Button>
+                        <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingProof}>
+                            {isSubmittingProof ? <Loader2 className="animate-spin" /> : "Submit Proof"}
+                        </Button>
                     </form>
                 </Form>
             </CardContent>

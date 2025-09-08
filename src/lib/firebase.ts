@@ -1,6 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 // For more information on how to get this, visit:
@@ -13,5 +14,6 @@ export const firebaseConfig = {"apiKey":"AIzaSyDnFrJWS2t_05w8i3rLen8UXK6nP8eNY1g
 // This pattern prevents re-initializing the app on every hot-reload
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-export { app, auth };
+export { app, auth, db };

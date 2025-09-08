@@ -60,7 +60,7 @@ export default function AdminPage() {
         icon: Users
     },
     {
-        href: "#",
+        href: "/dashboard/admin/transactions",
         title: "All Transactions",
         description: "Review all deposits and withdrawals.",
         icon: List
