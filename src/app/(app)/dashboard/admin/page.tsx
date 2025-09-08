@@ -54,7 +54,7 @@ export default function AdminPage() {
       icon: DollarSign
     },
     {
-        href: "#",
+        href: "/dashboard/admin/users",
         title: "Manage Users",
         description: "View, edit, or suspend user accounts.",
         icon: Users
