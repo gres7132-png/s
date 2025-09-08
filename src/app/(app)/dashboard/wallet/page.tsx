@@ -35,9 +35,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, DollarSign } from "lucide-react";
+import { Copy, DollarSign, Link as LinkIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
+import Link from "next/link";
+
 
 interface UserWalletData {
     withdrawableBalance: number;
@@ -84,12 +86,14 @@ export default function WalletPage() {
     });
 
   const bankingDetailsSchema = z.object({
-    paymentMethod: z.enum(["mobile", "crypto"]),
+    paymentMethod: z.enum(["mobile", "crypto", "minipay"]),
     mobileNumber: z.string().optional(),
+    minipayNumber: z.string().optional(),
     cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
     cryptoAddress: z.string().optional(),
   }).refine(data => {
       if (data.paymentMethod === "mobile") return !!data.mobileNumber;
+      if (data.paymentMethod === "minipay") return !!data.minipayNumber;
       if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress;
       return true;
   }, {
@@ -166,6 +170,30 @@ export default function WalletPage() {
         </Button>
     </div>
   );
+  
+  const MinipayDetailRow = ({ label, link, number }: { label: string; link: string; number: string }) => (
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-border/50">
+      <div>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <div className="flex items-center gap-2">
+            <LinkIcon className="h-4 w-4 text-muted-foreground" />
+            <Link href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline font-bold">
+                {link}
+            </Link>
+        </div>
+        <p className="text-sm text-muted-foreground break-all font-bold mt-1">Number: {number}</p>
+      </div>
+       <Button 
+            size="icon" 
+            variant="ghost" 
+            className="flex-shrink-0"
+            onClick={() => copyToClipboard(number, "Minipay Number")}
+            aria-label="Copy Minipay Number"
+        >
+            <Copy className="h-4 w-4" />
+        </Button>
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -194,6 +222,7 @@ export default function WalletPage() {
                 <div className="space-y-2 rounded-lg border p-4">
                     <h3 className="font-semibold mb-2">Company Payment Details</h3>
                      <div className="space-y-2">
+                        <MinipayDetailRow label="Minipay" link={paymentDetails.minipay.link} number={paymentDetails.minipay.number} />
                         <DetailRow label="Mobile Money" value={paymentDetails.mobileMoney} />
                         <DetailRow label="BTC Address" value={paymentDetails.crypto.BTC} />
                         <DetailRow label="ETH Address" value={paymentDetails.crypto.ETH} />
@@ -296,6 +325,7 @@ export default function WalletPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem value="minipay">Minipay</SelectItem>
                             <SelectItem value="mobile">Mobile Money (Airtel/Safaricom)</SelectItem>
                             <SelectItem value="crypto">Crypto Wallet (BTC, ETH, USDT)</SelectItem>
                           </SelectContent>
@@ -314,6 +344,22 @@ export default function WalletPage() {
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g. 0712345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {selectedPaymentMethod === "minipay" && (
+                    <FormField
+                      control={bankingDetailsForm.control}
+                      name="minipayNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Minipay Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 0781309701" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

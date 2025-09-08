@@ -11,6 +11,10 @@
 // --- Payment Details ---
 export const paymentDetails = {
     mobileMoney: "0113628476",
+    minipay: {
+        link: "https://link.minipay.xyz/invite?ref=lgBQTxG8",
+        number: "0781309701",
+    },
     crypto: {
         BTC: "37RLrPwt7uwnWGsS9v5vQoHSGZcV8Z2kkt",
         ETH: "0xb101ACA109F490d8c0BeFa65B94B7246056c4009",
