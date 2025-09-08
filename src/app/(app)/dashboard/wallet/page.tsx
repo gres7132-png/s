@@ -40,12 +40,31 @@ import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 
 interface UserWalletData {
     withdrawableBalance: number;
 }
+
+const bankingDetailsSchema = z.object({
+    paymentMethod: z.enum(["mobile", "crypto", "minipay"]),
+    mobileNumber: z.string().optional(),
+    minipayNumber: z.string().optional(),
+    cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
+    cryptoAddress: z.string().optional(),
+}).refine(data => {
+    if (data.paymentMethod === "mobile") return !!data.mobileNumber;
+    if (data.paymentMethod === "minipay") return !!data.minipayNumber;
+    if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress;
+    return true;
+}, {
+    message: "Please fill in the required details for the selected payment method.",
+    path: ["paymentMethod"],
+});
+
+type BankingDetailsFormValues = z.infer<typeof bankingDetailsSchema>;
+
 
 export default function WalletPage() {
   const { toast } = useToast();
@@ -54,6 +73,15 @@ export default function WalletPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
   const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [savedPaymentDetails, setSavedPaymentDetails] = useState<BankingDetailsFormValues | null>(null);
+
+  const bankingDetailsForm = useForm<BankingDetailsFormValues>({
+    resolver: zodResolver(bankingDetailsSchema),
+    defaultValues: {
+      paymentMethod: "mobile",
+    },
+  });
 
   useEffect(() => {
     if (user) {
@@ -63,12 +91,20 @@ export default function WalletPage() {
             // --- Backend Fetching Placeholder ---
             // const data = await getUserWalletData(user.uid);
             // setWalletData(data);
+
+            const detailsDocRef = doc(db, "userPaymentDetails", user.uid);
+            const detailsDocSnap = await getDoc(detailsDocRef);
+            if (detailsDocSnap.exists()) {
+                const details = detailsDocSnap.data() as BankingDetailsFormValues;
+                setSavedPaymentDetails(details);
+                bankingDetailsForm.reset(details);
+            }
             
             setIsLoading(false);
         };
         fetchWalletData();
     }
-  }, [user]);
+  }, [user, bankingDetailsForm]);
 
   const copyToClipboard = (text: string | undefined, label: string) => {
     if (!text) return;
@@ -89,22 +125,6 @@ export default function WalletPage() {
         .max(withdrawableBalance, { message: `Amount exceeds withdrawable balance of ${formatCurrency(withdrawableBalance, true)}.` }),
     });
 
-  const bankingDetailsSchema = z.object({
-    paymentMethod: z.enum(["mobile", "crypto", "minipay"]),
-    mobileNumber: z.string().optional(),
-    minipayNumber: z.string().optional(),
-    cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
-    cryptoAddress: z.string().optional(),
-  }).refine(data => {
-      if (data.paymentMethod === "mobile") return !!data.mobileNumber;
-      if (data.paymentMethod === "minipay") return !!data.minipayNumber;
-      if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress;
-      return true;
-  }, {
-      message: "Please fill in the required details for the selected payment method.",
-      path: ["paymentMethod"],
-  });
-
   const depositSchema = z.object({
       transactionProof: z.string().min(10, "Please enter a valid transaction ID or hash."),
   });
@@ -113,26 +133,14 @@ export default function WalletPage() {
     resolver: zodResolver(withdrawalSchema),
   });
 
-  const bankingDetailsForm = useForm<z.infer<typeof bankingDetailsSchema>>({
-    resolver: zodResolver(bankingDetailsSchema),
-    defaultValues: {
-      paymentMethod: "mobile",
-    },
-  });
-
   const depositForm = useForm<z.infer<typeof depositSchema>>({
     resolver: zodResolver(depositSchema),
   });
 
   async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
-    if (!user) {
-        toast({
-            variant: "destructive",
-            title: "Not Authenticated",
-            description: "You must be logged in to request a withdrawal.",
-        });
-        return;
-    }
+    if (!user) { return toast({ variant: "destructive", title: "Not Authenticated" }); }
+    if (!savedPaymentDetails) { return toast({ variant: "destructive", title: "No Payment Details", description: "Please save your payment details before requesting a withdrawal."}); }
+
     setIsRequestingWithdrawal(true);
     try {
         await addDoc(collection(db, "withdrawalRequests"), {
@@ -140,7 +148,8 @@ export default function WalletPage() {
             userName: user.displayName || 'Unknown User',
             amount: values.amount,
             requestedAt: serverTimestamp(),
-            status: 'pending', // Initial status
+            status: 'pending',
+            paymentDetails: savedPaymentDetails,
         });
 
         toast({
@@ -161,12 +170,24 @@ export default function WalletPage() {
     }
   }
 
-  function onBankingDetailsSubmit(values: z.infer<typeof bankingDetailsSchema>) {
-    console.log("Banking details update:", values);
-    toast({
-      title: "Banking Details Updated",
-      description: "Your payment information has been saved securely.",
-    });
+  async function onBankingDetailsSubmit(values: BankingDetailsFormValues) {
+    if (!user) { return toast({ variant: "destructive", title: "Not Authenticated" }); }
+    
+    setIsSavingDetails(true);
+    try {
+        const detailsDocRef = doc(db, "userPaymentDetails", user.uid);
+        await setDoc(detailsDocRef, values, { merge: true });
+        setSavedPaymentDetails(values); // Optimistic update
+        toast({
+            title: "Banking Details Updated",
+            description: "Your payment information has been saved securely.",
+        });
+    } catch (error) {
+         console.error("Error saving payment details:", error);
+         toast({ variant: "destructive", title: "Save Failed", description: "Could not save your payment details."});
+    } finally {
+        setIsSavingDetails(false);
+    }
   }
 
   async function onDepositSubmit(values: z.infer<typeof depositSchema>) {
@@ -186,7 +207,7 @@ export default function WalletPage() {
             userName: user.displayName || 'Unknown User',
             proof: values.transactionProof,
             submittedAt: serverTimestamp(),
-            status: 'pending', // Initial status
+            status: 'pending',
         });
 
         toast({
@@ -385,7 +406,7 @@ export default function WalletPage() {
                         <FormLabel>Payment Method</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger disabled={isSavingDetails}>
                               <SelectValue placeholder="Select a payment method" />
                             </SelectTrigger>
                           </FormControl>
@@ -408,7 +429,7 @@ export default function WalletPage() {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 0712345678" {...field} />
+                            <Input placeholder="e.g. 0712345678" {...field} disabled={isSavingDetails} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -424,7 +445,7 @@ export default function WalletPage() {
                         <FormItem>
                           <FormLabel>Minipay Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 0781309701" {...field} />
+                            <Input placeholder="e.g. 0781309701" {...field} disabled={isSavingDetails} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -440,7 +461,7 @@ export default function WalletPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Cryptocurrency</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                             <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSavingDetails}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select a currency" />
@@ -463,7 +484,7 @@ export default function WalletPage() {
                           <FormItem>
                             <FormLabel>Wallet Address</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter your wallet address" {...field} />
+                              <Input placeholder="Enter your wallet address" {...field} disabled={isSavingDetails} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -472,7 +493,9 @@ export default function WalletPage() {
                     </div>
                   )}
                   
-                  <Button type="submit" className="w-full">Save Details</Button>
+                  <Button type="submit" className="w-full" disabled={isSavingDetails}>
+                    {isSavingDetails ? <Loader2 className="animate-spin" /> : "Save Details"}
+                  </Button>
                 </form>
               </Form>
             </CardContent>

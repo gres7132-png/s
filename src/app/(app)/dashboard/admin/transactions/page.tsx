@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, XCircle, ShieldAlert, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, ShieldAlert, ArrowUpCircle, ArrowDownCircle, Info } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import {
@@ -35,6 +35,12 @@ import {
 } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface TransactionProof {
   id: string;
@@ -44,12 +50,21 @@ interface TransactionProof {
   status: 'pending' | 'approved' | 'rejected';
 }
 
+interface PaymentDetails {
+    paymentMethod: 'mobile' | 'crypto' | 'minipay';
+    mobileNumber?: string;
+    minipayNumber?: string;
+    cryptoCurrency?: 'BTC' | 'ETH' | 'USDT';
+    cryptoAddress?: string;
+}
+
 interface WithdrawalRequest {
   id: string;
   userName: string;
   amount: number;
   requestedAt: Timestamp;
   status: 'pending' | 'approved' | 'rejected';
+  paymentDetails: PaymentDetails;
 }
 
 export default function TransactionsPage() {
@@ -67,7 +82,6 @@ export default function TransactionsPage() {
   useEffect(() => {
     if (!isAdmin) return;
 
-    // Listener for Deposits (Transaction Proofs)
     const depositsQuery = query(collection(db, "transactionProofs"), orderBy("submittedAt", "desc"));
     const unsubscribeDeposits = onSnapshot(depositsQuery, (querySnapshot) => {
       const fetchedProofs: TransactionProof[] = [];
@@ -82,7 +96,6 @@ export default function TransactionsPage() {
       setLoadingDeposits(false);
     });
 
-    // Listener for Withdrawals
     const withdrawalsQuery = query(collection(db, "withdrawalRequests"), orderBy("requestedAt", "desc"));
     const unsubscribeWithdrawals = onSnapshot(withdrawalsQuery, (querySnapshot) => {
       const fetchedWithdrawals: WithdrawalRequest[] = [];
@@ -169,6 +182,31 @@ export default function TransactionsPage() {
         </div>
      );
   };
+  
+  const renderPaymentDetails = (details: PaymentDetails) => {
+    let detailText: string;
+    switch (details.paymentMethod) {
+        case 'mobile': detailText = `Mobile: ${details.mobileNumber}`; break;
+        case 'minipay': detailText = `Minipay: ${details.minipayNumber}`; break;
+        case 'crypto': detailText = `${details.cryptoCurrency}: ${details.cryptoAddress}`; break;
+        default: detailText = 'No details';
+    }
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 cursor-pointer">
+                        <Info className="h-4 w-4 text-muted-foreground" /> 
+                        {details.paymentMethod}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p className="font-mono text-xs">{detailText}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+  };
 
 
   return (
@@ -240,25 +278,27 @@ export default function TransactionsPage() {
                                 <TableHead>User</TableHead>
                                 <TableHead>Requested</TableHead>
                                 <TableHead>Amount</TableHead>
+                                <TableHead>Payment Details</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                              {loadingWithdrawals ? (
-                                <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></TableCell></TableRow>
                             ) : withdrawals.length > 0 ? (
                                 withdrawals.map((req) => (
                                 <TableRow key={req.id} className={updatingId === req.id ? 'opacity-50' : ''}>
                                     <TableCell className="font-medium">{req.userName}</TableCell>
                                     <TableCell className="text-muted-foreground">{req.requestedAt ? formatDistanceToNow(req.requestedAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
                                     <TableCell className="font-medium">{formatCurrency(req.amount)}</TableCell>
+                                    <TableCell>{renderPaymentDetails(req.paymentDetails)}</TableCell>
                                     <TableCell>{renderStatusBadge(req.status)}</TableCell>
                                     <TableCell className="text-right">{renderActionButtons("withdrawalRequests", req.id, req.status)}</TableCell>
                                 </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No withdrawal requests yet.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No withdrawal requests yet.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
