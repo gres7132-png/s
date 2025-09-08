@@ -72,6 +72,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function UserDetailsPage({ params }: { params: { userId: string } }) {
+  const { userId } = params;
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -87,11 +88,11 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   });
 
   useEffect(() => {
-    if (params.userId) {
+    if (userId) {
       setLoading(true);
       // --- Backend Fetching Placeholder ---
-      // const userData = await getUserDetails(params.userId);
-      const userData = mockUsers.find(u => u.uid === params.userId) || null;
+      // const userData = await getUserDetails(userId);
+      const userData = mockUsers.find(u => u.uid === userId) || null;
       setUser(userData);
       form.reset({
         displayName: userData?.displayName || "",
@@ -99,14 +100,14 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
       });
       setLoading(false);
     }
-  }, [params.userId, form]);
+  }, [userId, form]);
 
   async function onSubmit(values: ProfileFormValues) {
     setLoading(true);
     try {
       // --- Backend Logic Placeholder ---
-      // await updateUserProfile(params.userId, values);
-      console.log("Profile update for", params.userId, values);
+      // await updateUserProfile(userId, values);
+      console.log("Profile update for", userId, values);
       toast({
         title: "Profile Updated",
         description: `${values.displayName}'s profile has been updated.`,
