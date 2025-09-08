@@ -54,12 +54,6 @@ export default function AdminPage() {
       icon: DollarSign
     },
     {
-      href: "/dashboard/admin/settings",
-      title: "Site Settings",
-      description: "Update payment details and fees.",
-      icon: Settings
-    },
-    {
         href: "#",
         title: "Manage Users",
         description: "View, edit, or suspend user accounts.",

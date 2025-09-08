@@ -37,26 +37,15 @@ import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Copy, DollarSign } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-
-interface DepositDetails {
-    mobileMoney: string;
-    crypto: {
-        BTC: string;
-        ETH: string;
-        USDT: string;
-    };
-    minipay: string;
-}
+import { paymentDetails } from "@/lib/config";
 
 interface UserWalletData {
     withdrawableBalance: number;
 }
 
-
 export default function WalletPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [depositDetails, setDepositDetails] = useState<DepositDetails | null>(null);
   const [walletData, setWalletData] = useState<UserWalletData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -66,11 +55,7 @@ export default function WalletPage() {
             setIsLoading(true);
             
             // --- Backend Fetching Placeholder ---
-            // const [details, data] = await Promise.all([
-            //     getCompanyPaymentDetails(),
-            //     getUserWalletData(user.uid)
-            // ]);
-            // setDepositDetails(details);
+            // const data = await getUserWalletData(user.uid);
             // setWalletData(data);
             
             setIsLoading(false);
@@ -99,15 +84,13 @@ export default function WalletPage() {
     });
 
   const bankingDetailsSchema = z.object({
-    paymentMethod: z.enum(["mobile", "crypto", "whatsapp"]),
+    paymentMethod: z.enum(["mobile", "crypto"]),
     mobileNumber: z.string().optional(),
     cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
     cryptoAddress: z.string().optional(),
-    whatsappNumber: z.string().optional(),
   }).refine(data => {
       if (data.paymentMethod === "mobile") return !!data.mobileNumber;
       if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress;
-      if (data.paymentMethod === "whatsapp") return !!data.whatsappNumber;
       return true;
   }, {
       message: "Please fill in the required details for the selected payment method.",
@@ -165,9 +148,7 @@ export default function WalletPage() {
     <div className="flex items-center justify-between gap-4 py-3 border-b border-border/50">
         <div>
             <p className="text-sm font-semibold text-foreground">{label}</p>
-            {isLoading ? (
-                <Skeleton className="h-5 w-48 mt-1" />
-            ) : value ? (
+            {value ? (
                 <p className="text-sm text-muted-foreground break-all font-bold">{value}</p>
             ) : (
                 <p className="text-sm text-muted-foreground font-bold">-</p>
@@ -179,7 +160,7 @@ export default function WalletPage() {
             className="flex-shrink-0"
             onClick={() => copyToClipboard(value, label)}
             aria-label={`Copy ${label}`}
-            disabled={!value || isLoading}
+            disabled={!value}
         >
             <Copy className="h-4 w-4" />
         </Button>
@@ -206,18 +187,17 @@ export default function WalletPage() {
             <CardHeader>
                 <CardTitle>Make a Deposit</CardTitle>
                 <CardDescription>
-                    To add funds, please make a payment to one of the addresses below. These details are provided by the admin.
+                    To add funds, please make a payment to one of the addresses below.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="space-y-2 rounded-lg border p-4">
                     <h3 className="font-semibold mb-2">Company Payment Details</h3>
                      <div className="space-y-2">
-                        <DetailRow label="Mobile Money (Airtel/Safaricom)" value={depositDetails?.mobileMoney} />
-                        <DetailRow label="BTC Address" value={depositDetails?.crypto.BTC} />
-                        <DetailRow label="ETH Address" value={depositDetails?.crypto.ETH} />
-                        <DetailRow label="USDT Address" value={depositDetails?.crypto.USDT} />
-                        <DetailRow label="MiniPay (WhatsApp)" value={depositDetails?.minipay} />
+                        <DetailRow label="Mobile Money" value={paymentDetails.mobileMoney} />
+                        <DetailRow label="BTC Address" value={paymentDetails.crypto.BTC} />
+                        <DetailRow label="ETH Address" value={paymentDetails.crypto.ETH} />
+                        <DetailRow label="USDT Address" value={paymentDetails.crypto.USDT} />
                     </div>
                 </div>
 
@@ -318,7 +298,6 @@ export default function WalletPage() {
                           <SelectContent>
                             <SelectItem value="mobile">Mobile Money (Airtel/Safaricom)</SelectItem>
                             <SelectItem value="crypto">Crypto Wallet (BTC, ETH, USDT)</SelectItem>
-                            <SelectItem value="whatsapp">WhatsApp (MiniPay)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -380,25 +359,6 @@ export default function WalletPage() {
                         )}
                       />
                     </div>
-                  )}
-
-                  {selectedPaymentMethod === "whatsapp" && (
-                     <FormField
-                        control={bankingDetailsForm.control}
-                        name="whatsappNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>WhatsApp Number (for MiniPay)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g. +1234567890" {...field} />
-                            </FormControl>
-                             <FormDescription>
-                                Include your country code.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                   )}
                   
                   <Button type="submit" className="w-full">Save Details</Button>
