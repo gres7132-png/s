@@ -19,10 +19,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { Copy, Loader2 } from "lucide-react";
+import { Copy, Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // This interface defines the structure for a referred user object.
 interface ReferredUser {
@@ -72,7 +73,7 @@ export default function ReferralsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Referral Program</h1>
         <p className="text-muted-foreground">
-          Earn a 5% commission for every new user you refer who invests.
+          Earn multi-level commissions from your network's investments.
         </p>
       </div>
 
@@ -94,18 +95,30 @@ export default function ReferralsPage() {
           </div>
         </CardContent>
       </Card>
+
+       <Alert>
+          <Users className="h-4 w-4" />
+          <AlertTitle>Multi-Level Commission Structure</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+                <li><strong>Level 1:</strong> Earn a <strong>5%</strong> commission on the initial deposit of users you directly refer.</li>
+                <li><strong>Level 2:</strong> Earn a <strong>1%</strong> commission when your referred users refer others.</li>
+                <li><strong>Level 3+:</strong> Earn a <strong>0.1%</strong> commission for all subsequent referral levels in your network.</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
       
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Your Referrals</CardTitle>
+              <CardTitle>Your Direct Referrals (Level 1)</CardTitle>
               <CardDescription>
-                Track the status of your referred users and your commissions.
+                Track the status of users you've personally referred.
               </CardDescription>
             </div>
             <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Commission Earned</p>
+                <p className="text-sm text-muted-foreground">Level 1 Commission Earned</p>
                 <p className="text-2xl font-bold">{formatCurrency(totalCommission)}</p>
             </div>
           </div>
