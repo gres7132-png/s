@@ -53,6 +53,7 @@ export default function WalletPage() {
   const [walletData, setWalletData] = useState<UserWalletData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
+  const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -123,13 +124,41 @@ export default function WalletPage() {
     resolver: zodResolver(depositSchema),
   });
 
-  function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
-    console.log("Withdrawal request:", values);
-    toast({
-      title: "Withdrawal Requested",
-      description: `Your request to withdraw ${formatCurrency(values.amount)} is being processed.`,
-    });
-    withdrawalForm.reset();
+  async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Not Authenticated",
+            description: "You must be logged in to request a withdrawal.",
+        });
+        return;
+    }
+    setIsRequestingWithdrawal(true);
+    try {
+        await addDoc(collection(db, "withdrawalRequests"), {
+            userId: user.uid,
+            userName: user.displayName || 'Unknown User',
+            amount: values.amount,
+            requestedAt: serverTimestamp(),
+            status: 'pending', // Initial status
+        });
+
+        toast({
+          title: "Withdrawal Requested",
+          description: `Your request to withdraw ${formatCurrency(values.amount)} is being processed.`,
+        });
+        withdrawalForm.reset();
+
+    } catch (error) {
+        console.error("Error submitting withdrawal request:", error);
+        toast({
+            variant: "destructive",
+            title: "Request Failed",
+            description: "Could not submit your withdrawal request. Please try again.",
+        });
+    } finally {
+        setIsRequestingWithdrawal(false);
+    }
   }
 
   function onBankingDetailsSubmit(values: z.infer<typeof bankingDetailsSchema>) {
@@ -316,7 +345,7 @@ export default function WalletPage() {
                         <FormControl>
                           <div className="relative">
                             <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input type="number" placeholder="0.00" className="pl-8" {...field} />
+                            <Input type="number" placeholder="0.00" className="pl-8" {...field} disabled={isRequestingWithdrawal}/>
                           </div>
                         </FormControl>
                         <FormDescription>
@@ -326,7 +355,9 @@ export default function WalletPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Request Withdrawal</Button>
+                  <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isRequestingWithdrawal}>
+                     {isRequestingWithdrawal ? <Loader2 className="animate-spin" /> : "Request Withdrawal"}
+                  </Button>
                 </form>
               </Form>
             </CardContent>
