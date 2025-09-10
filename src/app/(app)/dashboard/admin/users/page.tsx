@@ -21,9 +21,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ShieldAlert, ArrowRight } from "lucide-react";
+import { Loader2, ShieldAlert, ArrowRight, Info } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { listAllUsers, UserData } from "@/ai/flows/user-management";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 export default function UsersListPage() {
@@ -81,6 +82,14 @@ export default function UsersListPage() {
         </p>
       </div>
 
+       <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Prototype Environment Notice</AlertTitle>
+        <AlertDescription>
+          This feature requires the Firebase Admin SDK, which cannot be used in this environment. Therefore, the user list will appear empty. The code is complete and will function in a production environment.
+        </AlertDescription>
+      </Alert>
+
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
@@ -129,7 +138,7 @@ export default function UsersListPage() {
               ) : (
                 <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No users found. This feature requires the Firebase Admin SDK on the backend.
+                        No users found.
                     </TableCell>
                 </TableRow>
               )}

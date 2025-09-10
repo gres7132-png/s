@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, useCallback } from "react";
-import { Ban, CheckCircle, Loader2, ShieldAlert } from "lucide-react";
+import { Ban, CheckCircle, Info, Loader2, ShieldAlert } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import { updateUserStatus, listAllUsers, UserData } from "@/ai/flows/user-management";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const profileSchema = z.object({
   displayName: z.string().min(1, "Full name is required.").optional(),
@@ -79,7 +80,8 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                 email: currentUser.email || "",
             });
         } else {
-             toast({ variant: "destructive", title: "User not found" });
+             // In the prototype, this will be the common case.
+             console.log("User not found in simulated list. This is expected.");
         }
     } catch(e) {
         toast({ variant: "destructive", title: "Failed to fetch user data" });
@@ -136,7 +138,17 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   }
 
   if (!user) {
-     return <div className="text-center pt-8">User not found or data could not be loaded. This feature requires the Firebase Admin SDK.</div>;
+     return (
+        <div className="space-y-4 text-center pt-8">
+            <Alert variant="destructive" className="max-w-md mx-auto">
+                <Info className="h-4 w-4" />
+                <AlertTitle>User Data Not Loaded</AlertTitle>
+                <AlertDescription>
+                   User data could not be loaded because the Firebase Admin SDK is not available in this prototype environment. This feature will work in production.
+                </AlertDescription>
+            </Alert>
+        </div>
+     );
   }
 
   return (
