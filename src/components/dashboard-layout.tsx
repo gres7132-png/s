@@ -14,6 +14,7 @@ import {
   Gift,
   TrendingUp,
   Shield,
+  LifeBuoy,
 } from "lucide-react";
 
 import { signOut } from "firebase/auth";
@@ -123,6 +124,17 @@ function NavMenu() {
 
       <SidebarFooter className="mt-auto">
         <SidebarMenu>
+           <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip="Support"
+            >
+              <a href="https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ?mode=ems_wa_t" target="_blank" rel="noopener noreferrer">
+                <LifeBuoy />
+                <span>Support</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
              <SidebarMenuButton onClick={handleLogout} tooltip="Log Out">
                 <LogOut />
