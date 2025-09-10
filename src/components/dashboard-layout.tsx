@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Shield,
   LifeBuoy,
+  Globe,
 } from "lucide-react";
 
 import { signOut } from "firebase/auth";
@@ -248,8 +249,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center justify-between lg:justify-end border-b px-4 lg:px-6">
+        <header className="flex h-14 items-center justify-between lg:justify-end gap-2 border-b px-4 lg:px-6">
           <SidebarTrigger className="lg:hidden h-12 w-12 [&>svg]:h-8 [&>svg]:w-8" />
+          <Button variant="outline" size="sm" asChild>
+              <Link href="/website">
+                <Globe />
+                <span>Go to Website</span>
+              </Link>
+          </Button>
           <UserProfileNav />
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">

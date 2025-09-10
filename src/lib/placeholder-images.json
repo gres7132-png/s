@@ -1,0 +1,9 @@
+
+{
+    "cryptoFarm": {
+        "src": "https://picsum.photos/seed/cryptofarm/600/400",
+        "width": 600,
+        "height": 400,
+        "hint": "crypto farm"
+    }
+}
