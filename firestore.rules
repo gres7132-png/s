@@ -1,64 +1,74 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // --- USER DATA RULES ---
-    // Users can only read/write their own data.
-    match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
-      
-      // A user can read their own referrals subcollection
-      match /referrals/{referralId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      // A user can read their own investments subcollection
-      match /investments/{investmentId} {
-        allow read, write: if request.auth_ != null && request.auth.uid == userId;
-      }
+
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the requesting user is the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Users can only read/write their own stats, earnings log, and payment details
+    // USERS: Users can read/write their own data.
+    // This includes their main document and any subcollections like investments.
+    match /users/{userId}/{documents=**} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // USER SIGN-UP (REFERRALS): Allow a newly created user to write to another user's referral subcollection.
+    // This is a specific exception needed for the referral system to work on sign-up.
+    match /users/{referrerId}/referrals/{newUserId} {
+        allow create: if isAuthenticated() && newUserId == request.auth.uid;
+    }
+
+    // USER STATS: Users can only read/write their own stats.
     match /userStats/{userId} {
-       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
+
+    // EARNINGS LOG: Users can only read/write their own earnings log.
     match /earningsLog/{userId} {
-       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
-     match /userPaymentDetails/{userId} {
-       allow read, write: if request.auth != null && request.auth.uid == userId;
+    
+    // PAYMENT DETAILS: Users can only read/write their own payment details.
+    match /userPaymentDetails/{userId} {
+        allow read, write: if isOwner(userId);
     }
 
-    // --- PUBLIC & ADMIN RULES ---
-    // Any authenticated user can see the list of packages and tiers
+    // PUBLIC DATA: Anyone can read the public investment packages, distributor tiers,
+    // and commission tiers. Only admins (via backend functions) should write.
     match /silverLevelPackages/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Only manageable via Admin SDK
+      allow read: if true;
+      allow write: if false; // Managed by admin panel via backend function
     }
-     match /distributorTiers/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Only manageable via Admin SDK
+    match /distributorTiers/{docId} {
+      allow read: if true;
+      allow write: if false; // Managed by admin panel via backend function
     }
-     match /commissionTiers/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Only manageable via Admin SDK
+    match /commissionTiers/{docId} {
+      allow read: if true;
+      allow write: if false; // Managed by admin panel via backend function
     }
 
-    // --- TRANSACTION RULES ---
-    // Any authenticated user can see the latest transactions.
-    // They can create their own deposit/withdrawal requests.
+    // TRANSACTION PROOFS (DEPOSITS): Authenticated users can create them.
+    // Only admins should be able to update/delete them.
     match /transactionProofs/{proofId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if false; // Only manageable via Admin SDK
+      allow create: if isAuthenticated();
+      allow read: if true; // To show on live transactions feed
+      allow update, delete: if false; // Managed by admin panel via backend function
     }
+
+    // WITHDRAWAL REQUESTS: Authenticated users can create them.
+    // Only admins should be able to update/delete them.
     match /withdrawalRequests/{reqId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if false; // Only manageable via Admin SDK
+      allow create: if isAuthenticated();
+      allow read: if true; // To show on live transactions feed
+      allow update, delete: if false; // Managed by admin panel via backend function
     }
   }
 }
