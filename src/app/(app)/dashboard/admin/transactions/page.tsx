@@ -69,6 +69,7 @@ interface WithdrawalRequest {
   requestedAt: Timestamp;
   status: 'pending' | 'approved' | 'rejected';
   paymentDetails: PaymentDetails;
+  serviceFee?: number;
 }
 
 export default function TransactionsPage() {
@@ -90,6 +91,7 @@ export default function TransactionsPage() {
   ) => {
     setUpdatingId(id);
     const collectionName = type === 'deposit' ? "transactionProofs" : "withdrawalRequests";
+    const WITHDRAWAL_FEE_RATE = 0.15;
     
     try {
         await runTransaction(db, async (transaction) => {
@@ -97,21 +99,25 @@ export default function TransactionsPage() {
             const userStatsDocRef = doc(db, "userStats", userId);
 
             // 1. Update the transaction status
-            transaction.update(transactionDocRef, { status });
+            if (type === 'withdrawal' && status === 'approved') {
+                const serviceFee = amount * WITHDRAWAL_FEE_RATE;
+                transaction.update(transactionDocRef, { status, serviceFee });
+            } else {
+                transaction.update(transactionDocRef, { status });
+            }
 
             // 2. If approved, update the user's balance
             if (status === 'approved') {
                 const userStatsDoc = await transaction.get(userStatsDocRef);
-                if (!userStatsDoc.exists()) {
-                    // Create the stats doc if it doesn't exist
-                    const initialBalance = type === 'deposit' ? amount : 0;
+                if (!userStatsDoc.exists() && type === 'deposit') {
+                    // Create the stats doc if it doesn't exist on first deposit
                      transaction.set(userStatsDocRef, { 
-                        availableBalance: initialBalance,
-                        rechargeAmount: initialBalance,
+                        availableBalance: amount,
+                        rechargeAmount: amount,
                         withdrawalAmount: 0,
                         todaysEarnings: 0,
                      });
-                } else {
+                } else if (userStatsDoc.exists()) {
                     const currentStats = userStatsDoc.data();
                     let newBalance = currentStats.availableBalance;
                     let newRecharge = currentStats.rechargeAmount || 0;
@@ -121,6 +127,9 @@ export default function TransactionsPage() {
                         newBalance += amount;
                         newRecharge += amount;
                     } else { // withdrawal
+                        if (newBalance < amount) {
+                            throw new Error("User has insufficient funds for this withdrawal.");
+                        }
                         newBalance -= amount;
                         newWithdrawal += amount;
                     }
@@ -130,6 +139,9 @@ export default function TransactionsPage() {
                         rechargeAmount: newRecharge,
                         withdrawalAmount: newWithdrawal,
                     });
+                } else if (type === 'withdrawal') {
+                    // This should not happen if user can request withdrawal, but as a safeguard:
+                    throw new Error("Cannot process withdrawal for a user with no stats record.");
                 }
             }
         });
@@ -324,7 +336,7 @@ export default function TransactionsPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Withdrawal Requests</CardTitle>
-                    <CardDescription>Users request to withdraw funds. Verify the user's account and process the payment to their saved details. Approving will deduct the funds from their account.</CardDescription>
+                    <CardDescription>Users request to withdraw funds. Approving will deduct the full requested amount from their balance and apply a 15% service fee to the transaction. You must then manually send the final amount (requested amount - 15% fee) to the user's saved payment details.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
@@ -364,3 +376,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+    
