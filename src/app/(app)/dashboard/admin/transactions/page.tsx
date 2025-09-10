@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -32,6 +32,7 @@ import {
   doc,
   updateDoc,
   Timestamp,
+  runTransaction,
 } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from "@/lib/utils";
@@ -44,8 +45,10 @@ import {
 
 interface TransactionProof {
   id: string;
+  userId: string;
   userName: string;
   proof: string;
+  amount: number;
   submittedAt: Timestamp;
   status: 'pending' | 'approved' | 'rejected';
 }
@@ -60,6 +63,7 @@ interface PaymentDetails {
 
 interface WithdrawalRequest {
   id: string;
+  userId: string;
   userName: string;
   amount: number;
   requestedAt: Timestamp;
@@ -74,40 +78,108 @@ export default function TransactionsPage() {
   const [proofs, setProofs] = useState<TransactionProof[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   
-  const [loadingDeposits, setLoadingDeposits] = useState(true);
-  const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
-  
+  const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  const handleUpdateStatus = useCallback(async (
+    type: 'deposit' | 'withdrawal',
+    id: string,
+    userId: string,
+    amount: number,
+    status: 'approved' | 'rejected'
+  ) => {
+    setUpdatingId(id);
+    const collectionName = type === 'deposit' ? "transactionProofs" : "withdrawalRequests";
+    
+    try {
+        await runTransaction(db, async (transaction) => {
+            const transactionDocRef = doc(db, collectionName, id);
+            const userStatsDocRef = doc(db, "userStats", userId);
+
+            // 1. Update the transaction status
+            transaction.update(transactionDocRef, { status });
+
+            // 2. If approved, update the user's balance
+            if (status === 'approved') {
+                const userStatsDoc = await transaction.get(userStatsDocRef);
+                if (!userStatsDoc.exists()) {
+                    // Create the stats doc if it doesn't exist
+                    const initialBalance = type === 'deposit' ? amount : 0;
+                     transaction.set(userStatsDocRef, { 
+                        availableBalance: initialBalance,
+                        rechargeAmount: initialBalance,
+                        withdrawalAmount: 0,
+                        todaysEarnings: 0,
+                     });
+                } else {
+                    const currentStats = userStatsDoc.data();
+                    let newBalance = currentStats.availableBalance;
+                    let newRecharge = currentStats.rechargeAmount || 0;
+                    let newWithdrawal = currentStats.withdrawalAmount || 0;
+
+                    if (type === 'deposit') {
+                        newBalance += amount;
+                        newRecharge += amount;
+                    } else { // withdrawal
+                        newBalance -= amount;
+                        newWithdrawal += amount;
+                    }
+                    
+                    transaction.update(userStatsDocRef, { 
+                        availableBalance: newBalance,
+                        rechargeAmount: newRecharge,
+                        withdrawalAmount: newWithdrawal,
+                    });
+                }
+            }
+        });
+
+        toast({
+            title: "Status Updated",
+            description: `Transaction has been ${status}.`,
+        });
+
+    } catch (error: any) {
+        console.error("Error updating status:", error);
+        toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: error.message || `Could not update the transaction status.`,
+        });
+    } finally {
+        setUpdatingId(null);
+    }
+  }, [toast]);
+
+
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+        setLoading(false);
+        return;
+    };
+
+    setLoading(true);
 
     const depositsQuery = query(collection(db, "transactionProofs"), orderBy("submittedAt", "desc"));
-    const unsubscribeDeposits = onSnapshot(depositsQuery, (querySnapshot) => {
-      const fetchedProofs: TransactionProof[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedProofs.push({ id: doc.id, ...doc.data() } as TransactionProof);
-      });
+    const unsubscribeDeposits = onSnapshot(depositsQuery, (snapshot) => {
+      const fetchedProofs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionProof));
       setProofs(fetchedProofs);
-      setLoadingDeposits(false);
+      setLoading(false);
     }, (error) => {
       console.error("Error fetching transaction proofs:", error);
       toast({ variant: "destructive", title: "Error", description: "Could not fetch deposit proofs." });
-      setLoadingDeposits(false);
+      setLoading(false);
     });
 
     const withdrawalsQuery = query(collection(db, "withdrawalRequests"), orderBy("requestedAt", "desc"));
-    const unsubscribeWithdrawals = onSnapshot(withdrawalsQuery, (querySnapshot) => {
-      const fetchedWithdrawals: WithdrawalRequest[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedWithdrawals.push({ id: doc.id, ...doc.data() } as WithdrawalRequest);
-      });
+    const unsubscribeWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => {
+      const fetchedWithdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest));
       setWithdrawals(fetchedWithdrawals);
-      setLoadingWithdrawals(false);
+      setLoading(false);
     }, (error) => {
       console.error("Error fetching withdrawal requests:", error);
       toast({ variant: "destructive", title: "Error", description: "Could not fetch withdrawal requests." });
-      setLoadingWithdrawals(false);
+       setLoading(false);
     });
 
     return () => {
@@ -115,27 +187,6 @@ export default function TransactionsPage() {
       unsubscribeWithdrawals();
     };
   }, [isAdmin, toast]);
-
-  const handleUpdateStatus = async (collectionName: string, id: string, status: 'approved' | 'rejected') => {
-    setUpdatingId(id);
-    try {
-      const docRef = doc(db, collectionName, id);
-      await updateDoc(docRef, { status });
-      toast({
-        title: "Status Updated",
-        description: `Transaction has been ${status}.`,
-      });
-    } catch (error) {
-      console.error("Error updating status:", error);
-      toast({
-        variant: "destructive",
-        title: "Update Failed",
-        description: "Could not update the transaction status.",
-      });
-    } finally {
-      setUpdatingId(null);
-    }
-  };
 
   if (authLoading) {
     return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -157,16 +208,19 @@ export default function TransactionsPage() {
       </Badge>
   );
 
-  const renderActionButtons = (collection: string, id: string, status: 'pending' | 'approved' | 'rejected') => {
-     if (status !== 'pending') return null;
+  const renderActionButtons = (
+      type: 'deposit' | 'withdrawal',
+      item: TransactionProof | WithdrawalRequest
+  ) => {
+     if (item.status !== 'pending') return null;
      return (
         <div className="flex gap-2 justify-end">
             <Button
                 size="sm"
                 variant="outline"
                 className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
-                onClick={() => handleUpdateStatus(collection, id, 'approved')}
-                disabled={updatingId === id}
+                onClick={() => handleUpdateStatus(type, item.id, item.userId, item.amount, 'approved')}
+                disabled={updatingId === item.id}
             >
                 <CheckCircle className="h-4 w-4 mr-1" /> Approve
             </Button>
@@ -174,8 +228,8 @@ export default function TransactionsPage() {
                 size="sm"
                 variant="outline"
                 className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={() => handleUpdateStatus(collection, id, 'rejected')}
-                disabled={updatingId === id}
+                onClick={() => handleUpdateStatus(type, item.id, item.userId, item.amount, 'rejected')}
+                disabled={updatingId === item.id}
             >
                 <XCircle className="h-4 w-4 mr-1" /> Reject
             </Button>
@@ -208,7 +262,6 @@ export default function TransactionsPage() {
     );
   };
 
-
   return (
     <div className="space-y-8">
       <div>
@@ -238,6 +291,7 @@ export default function TransactionsPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>User</TableHead>
+                                <TableHead>Amount</TableHead>
                                 <TableHead>Submitted</TableHead>
                                 <TableHead>Proof/ID</TableHead>
                                 <TableHead>Status</TableHead>
@@ -245,20 +299,21 @@ export default function TransactionsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loadingDeposits ? (
-                                <TableRow><TableCell colSpan={5} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></TableCell></TableRow>
+                            {loading ? (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></TableCell></TableRow>
                             ) : proofs.length > 0 ? (
                                 proofs.map((proof) => (
                                 <TableRow key={proof.id} className={updatingId === proof.id ? 'opacity-50' : ''}>
                                     <TableCell className="font-medium">{proof.userName}</TableCell>
+                                     <TableCell>{formatCurrency(proof.amount)}</TableCell>
                                     <TableCell className="text-muted-foreground">{proof.submittedAt ? formatDistanceToNow(proof.submittedAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
                                     <TableCell className="font-mono text-xs break-all">{proof.proof}</TableCell>
                                     <TableCell>{renderStatusBadge(proof.status)}</TableCell>
-                                    <TableCell className="text-right">{renderActionButtons("transactionProofs", proof.id, proof.status)}</TableCell>
+                                    <TableCell className="text-right">{renderActionButtons('deposit', proof)}</TableCell>
                                 </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No deposit proofs submitted yet.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No deposit proofs submitted yet.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
@@ -284,7 +339,7 @@ export default function TransactionsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                             {loadingWithdrawals ? (
+                             {loading ? (
                                 <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></TableCell></TableRow>
                             ) : withdrawals.length > 0 ? (
                                 withdrawals.map((req) => (
@@ -294,7 +349,7 @@ export default function TransactionsPage() {
                                     <TableCell className="font-medium">{formatCurrency(req.amount)}</TableCell>
                                     <TableCell>{renderPaymentDetails(req.paymentDetails)}</TableCell>
                                     <TableCell>{renderStatusBadge(req.status)}</TableCell>
-                                    <TableCell className="text-right">{renderActionButtons("withdrawalRequests", req.id, req.status)}</TableCell>
+                                    <TableCell className="text-right">{renderActionButtons('withdrawal', req)}</TableCell>
                                 </TableRow>
                                 ))
                             ) : (
