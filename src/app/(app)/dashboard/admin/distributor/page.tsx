@@ -67,6 +67,16 @@ export default function ManageDistributorPage() {
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
 
+  const form = useForm<TierFormValues>({
+    resolver: zodResolver(tierSchema),
+    defaultValues: {
+      level: "",
+      monthlyIncome: 0,
+      purchasedProducts: 0,
+      deposit: 0,
+    },
+  });
+
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -87,21 +97,11 @@ export default function ManageDistributorPage() {
     return () => unsubscribe();
   }, [isAdmin, toast]);
 
-  const form = useForm<TierFormValues>({
-    resolver: zodResolver(tierSchema),
-    defaultValues: {
-      level: "",
-      monthlyIncome: 0,
-      purchasedProducts: 0,
-      deposit: 0,
-    },
-  });
-
   async function onSubmit(values: TierFormValues) {
     setFormLoading(true);
     try {
       await addDoc(collection(db, "distributorTiers"), values);
-      form.reset();
+      form.reset({ level: "", monthlyIncome: 0, purchasedProducts: 0, deposit: 0 });
       toast({
         title: "Tier Added",
         description: `Distributor level ${values.level} has been successfully created.`,

@@ -68,6 +68,17 @@ export default function ManageInvestmentsPage() {
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
 
+  const form = useForm<PackageFormValues>({
+    resolver: zodResolver(packageSchema),
+    defaultValues: {
+      name: "",
+      price: 0,
+      dailyReturn: 0,
+      duration: 0,
+      totalReturn: 0,
+    },
+  });
+
   useEffect(() => {
     if (!isAdmin) return;
     
@@ -88,22 +99,11 @@ export default function ManageInvestmentsPage() {
     return () => unsubscribe();
   }, [isAdmin, toast]);
 
-  const form = useForm<PackageFormValues>({
-    resolver: zodResolver(packageSchema),
-    defaultValues: {
-      name: "",
-      price: 0,
-      dailyReturn: 0,
-      duration: 0,
-      totalReturn: 0,
-    },
-  });
-
   async function onSubmit(values: PackageFormValues) {
     setFormLoading(true);
     try {
       await addDoc(collection(db, "silverLevelPackages"), values);
-      form.reset();
+      form.reset({ name: "", price: 0, dailyReturn: 0, duration: 0, totalReturn: 0 });
       toast({
         title: "Package Added",
         description: `${values.name} has been successfully created.`,

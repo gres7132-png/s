@@ -105,7 +105,7 @@ export default function ReferralsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Referral Program</h1>
         <p className="text-muted-foreground">
-          Earn multi-level commissions from your network's investments.
+          Earn commissions from your network's investments.
         </p>
       </div>
 
@@ -130,13 +130,11 @@ export default function ReferralsPage() {
 
        <Alert>
           <Users className="h-4 w-4" />
-          <AlertTitle>Multi-Level Commission Structure</AlertTitle>
+          <AlertTitle>Commission Structure</AlertTitle>
           <AlertDescription>
-            <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li><strong>Level 1:</strong> Earn a <strong>5%</strong> commission on the initial deposit of users you directly refer.</li>
-                <li><strong>Level 2:</strong> Earn a <strong>1%</strong> commission when your referred users refer others.</li>
-                <li><strong>Level 3+:</strong> Earn a <strong>0.1%</strong> commission for all subsequent referral levels in your network.</li>
-            </ul>
+            <p className="mt-2">
+                You earn a <strong>5%</strong> commission on the total amount invested by users you directly refer. The more your referrals invest, the more you earn.
+            </p>
           </AlertDescription>
         </Alert>
       
@@ -144,13 +142,13 @@ export default function ReferralsPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Your Direct Referrals (Level 1)</CardTitle>
+              <CardTitle>Your Direct Referrals</CardTitle>
               <CardDescription>
                 Track the status of users you've personally referred.
               </CardDescription>
             </div>
             <div className="text-right">
-                <p className="text-sm text-muted-foreground">Level 1 Commission Earned</p>
+                <p className="text-sm text-muted-foreground">Commission Earned</p>
                 <p className="text-2xl font-bold">{formatCurrency(totalCommission)}</p>
             </div>
           </div>
@@ -199,4 +197,3 @@ export default function ReferralsPage() {
     </div>
   );
 }
-

@@ -65,6 +65,14 @@ export default function ManageCommissionsPage() {
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
 
+  const form = useForm<TierFormValues>({
+    resolver: zodResolver(tierSchema),
+    defaultValues: {
+      referrals: 0,
+      commission: 0,
+    },
+  });
+
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -85,19 +93,11 @@ export default function ManageCommissionsPage() {
     return () => unsubscribe();
   }, [isAdmin, toast]);
 
-  const form = useForm<TierFormValues>({
-    resolver: zodResolver(tierSchema),
-    defaultValues: {
-      referrals: 0,
-      commission: 0,
-    },
-  });
-
   async function onSubmit(values: TierFormValues) {
     setFormLoading(true);
     try {
       await addDoc(collection(db, "commissionTiers"), values);
-      form.reset();
+      form.reset({ referrals: 0, commission: 0 });
       toast({
         title: "Tier Added",
         description: `Commission tier for ${values.referrals} referrals has been created.`,
