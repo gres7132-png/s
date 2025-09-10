@@ -25,9 +25,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Ban, CheckCircle, Loader2, ShieldAlert } from "lucide-react";
-import { User as FirebaseUser } from "firebase/auth";
 import {
   Table,
   TableBody,
@@ -39,13 +38,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
-
-// In a production app, this data would come from a secure backend API/Firebase Function
-// The client-side SDK cannot list or edit all users directly.
+import { updateUserStatus, listAllUsers, UserData } from "@/ai/flows/user-management";
 
 const profileSchema = z.object({
-  displayName: z.string().min(1, "Full name is required."),
-  email: z.string().email("Invalid email address.").readonly(),
+  displayName: z.string().min(1, "Full name is required.").optional(),
+  email: z.string().email("Invalid email address.").optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -54,13 +51,11 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const { userId } = params;
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  // State for user data, referrals, and transactions would be populated from your backend
-  const [user, setUser] = useState<(Partial<FirebaseUser> & { disabled?: boolean }) | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [referrals, setReferrals] = useState([]);
   const [transactions, setTransactions] = useState({ deposits: [], withdrawals: [] });
-
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -69,42 +64,42 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
       email: "",
     },
   });
-
-  useEffect(() => {
-    if (userId) {
-      setLoading(true);
-      // --- Backend Fetching Placeholder ---
-      // In a real app, you would make a secure call to your backend/Firebase Function here
-      // to get the user's details, their referrals, and their transaction history.
-      // const userData = await yourBackend.getUserDetails(userId);
-      // const referralData = await yourBackend.getUserReferrals(userId);
-      // const transactionData = await yourBackend.getUserTransactions(userId);
-      // setUser(userData);
-      // setReferrals(referralData);
-      // setTransactions(transactionData);
-      // form.reset({
-      //   displayName: userData?.displayName || "",
-      //   email: userData?.email || "",
-      // });
-      setLoading(false);
-    }
-  }, [userId, form]);
-
-  async function onSubmit(values: ProfileFormValues) {
+  
+  const fetchUserData = useCallback(async () => {
     setLoading(true);
     try {
-      // --- Backend Logic Placeholder ---
-      // await yourBackend.updateUserProfile(userId, values);
-      console.log("Profile update for", userId, values);
-      toast({
-        title: "Profile Updated",
-        description: `${values.displayName}'s profile has been updated.`,
-      });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Update Failed" });
+        // In a real app, you'd have a dedicated `getUser(uid)` flow.
+        // For this prototype, we'll fetch all users and find the one we need.
+        const { users } = await listAllUsers();
+        const currentUser = users.find(u => u.uid === userId);
+        if (currentUser) {
+            setUser(currentUser);
+            form.reset({
+                displayName: currentUser.displayName || "",
+                email: currentUser.email || "",
+            });
+        } else {
+             toast({ variant: "destructive", title: "User not found" });
+        }
+    } catch(e) {
+        toast({ variant: "destructive", title: "Failed to fetch user data" });
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
+  }, [userId, form, toast]);
+
+
+  useEffect(() => {
+    if (isAdmin && userId) {
+      fetchUserData();
+      // Fetching referrals and transactions would also happen here
+    }
+  }, [userId, isAdmin, fetchUserData]);
+
+  // Profile form submission is disabled as updating displayName/email
+  // requires the Admin SDK, which we are simulating.
+  async function onSubmit(values: ProfileFormValues) {
+    toast({ title: "Note", description: "Updating user profile details from the admin panel requires the Firebase Admin SDK and is disabled in this prototype." });
   }
 
   const handleToggleSuspend = async () => {
@@ -112,16 +107,16 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     setActionLoading(true);
     const newStatus = !user.disabled;
     try {
-        // --- Backend Logic Placeholder ---
-        // This would be a Firebase Function call to update the user's disabled state in Firebase Auth
-        // await yourBackend.toggleUserSuspension(user.uid, newStatus);
+        await updateUserStatus({ uid: user.uid, disabled: newStatus });
         setUser(prev => prev ? {...prev, disabled: newStatus } : null); // Optimistic update
         toast({
             title: `User ${newStatus ? 'Suspended' : 'Reactivated'}`,
-            description: `${user.displayName} has been ${newStatus ? 'suspended' : 'reactivated'}.`
+            description: `${user.displayName || user.email} has been ${newStatus ? 'suspended' : 'reactivated'}.`
         });
     } catch (error) {
         toast({ variant: "destructive", title: "Action Failed" });
+        // Revert optimistic update on failure
+        setUser(prev => prev ? {...prev, disabled: !newStatus } : null);
     } finally {
         setActionLoading(false);
     }
@@ -141,7 +136,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   }
 
   if (!user) {
-     return <div className="text-center pt-8">User not found or data could not be loaded.</div>;
+     return <div className="text-center pt-8">User not found or data could not be loaded. This feature requires the Firebase Admin SDK.</div>;
   }
 
   return (
@@ -169,14 +164,14 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                     </Avatar>
                   </div>
                   <FormField control={form.control} name="displayName" render={({ field }) => (
-                      <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem>
                   )}/>
                   <FormField control={form.control} name="email" render={({ field }) => (
                       <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted"/></FormControl><FormMessage /></FormItem>
                   )}/>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" disabled={loading}>Save Changes</Button>
+                  <Button type="submit" disabled>Save Changes</Button>
                 </CardFooter>
               </form>
             </Form>
@@ -189,7 +184,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
             </CardHeader>
             <CardContent>
               <Button 
-                variant={user.disabled ? "default" : "destructive"} 
+                variant={user.disabled ? "outline" : "destructive"} 
                 className="w-full"
                 onClick={handleToggleSuspend}
                 disabled={actionLoading}

@@ -23,26 +23,36 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ShieldAlert, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { User } from "firebase/auth";
+import { listAllUsers, UserData } from "@/ai/flows/user-management";
+
 
 export default function UsersListPage() {
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
-  const [users, setUsers] = useState<(Partial<User> & { disabled?: boolean })[]>([]);
+  const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+        setLoading(false);
+        return;
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
-        // --- Backend Fetching Placeholder ---
-        // In a production app, this data would come from a secure backend API/Firebase Function
-        // that can list all Firebase Auth users. Client-side SDKs cannot list users for security reasons.
-        // const fetchedUsers = await yourBackend.listAllUsers();
-        // setUsers(fetchedUsers);
-        setUsers([]); // Initialize with no users
-        setLoading(false);
+        try {
+            // This now calls our secure backend flow to get users.
+            const fetchedData = await listAllUsers();
+            setUsers(fetchedData.users);
+        } catch(error: any) {
+             toast({
+                variant: "destructive",
+                title: "Failed to Fetch Users",
+                description: error.message || "Could not retrieve the user list.",
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     fetchUsers();
@@ -119,7 +129,7 @@ export default function UsersListPage() {
               ) : (
                 <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No users found. Connect to a backend to list users.
+                        No users found. This feature requires the Firebase Admin SDK on the backend.
                     </TableCell>
                 </TableRow>
               )}
