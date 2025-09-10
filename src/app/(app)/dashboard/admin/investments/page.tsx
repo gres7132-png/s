@@ -33,7 +33,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Loader2, PlusCircle, Trash2 } from "lucide-react";
-import { silverLevelPackages as initialPackages } from "@/lib/config";
 import { formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -46,6 +45,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+
 
 const packageSchema = z.object({
   name: z.string().min(1, "Package name is required."),
@@ -60,16 +63,30 @@ type InvestmentPackage = PackageFormValues & { id: string };
 
 export default function ManageInvestmentsPage() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [packages, setPackages] = useState<InvestmentPackage[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
-    // --- Backend Fetching Placeholder ---
-    // In a real app, you would fetch this from Firestore
-    // const fetchedPackages = await getInvestmentPackages();
-    // setPackages(fetchedPackages);
-    setPackages(initialPackages.map((p, i) => ({ ...p, id: `silver-${i}` })));
-  }, []);
+    if (!isAdmin) return;
+    
+    const q = query(collection(db, "silverLevelPackages"), orderBy("price"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedPackages: InvestmentPackage[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedPackages.push({ id: doc.id, ...doc.data() } as InvestmentPackage);
+        });
+        setPackages(fetchedPackages);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching packages:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch investment packages." });
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, toast]);
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
@@ -83,15 +100,10 @@ export default function ManageInvestmentsPage() {
   });
 
   async function onSubmit(values: PackageFormValues) {
-    setLoading(true);
+    setFormLoading(true);
     try {
-      // --- Backend Logic Placeholder ---
-      // const newPackageId = await addInvestmentPackage(values);
-      const newPackage = { ...values, id: `new-${Date.now()}` };
-      
-      setPackages((prev) => [...prev, newPackage]);
+      await addDoc(collection(db, "silverLevelPackages"), values);
       form.reset();
-
       toast({
         title: "Package Added",
         description: `${values.name} has been successfully created.`,
@@ -103,16 +115,13 @@ export default function ManageInvestmentsPage() {
         description: "Could not add the package. Please try again.",
       });
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   }
 
   const handleDelete = async (packageId: string) => {
     try {
-        // --- Backend Logic Placeholder ---
-        // await deleteInvestmentPackage(packageId);
-
-        setPackages((prev) => prev.filter((p) => p.id !== packageId));
+        await deleteDoc(doc(db, "silverLevelPackages", packageId));
         toast({
             title: "Package Deleted",
             description: "The investment package has been removed.",
@@ -164,8 +173,8 @@ export default function ManageInvestmentsPage() {
                   )} />
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
+                  <Button type="submit" disabled={formLoading}>
+                    {formLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
                     Add Package
                   </Button>
                 </CardFooter>
@@ -193,7 +202,9 @@ export default function ManageInvestmentsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {packages.length > 0 ? packages.map((pkg) => (
+                            {loading ? (
+                                <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
+                            ) : packages.length > 0 ? packages.map((pkg) => (
                                 <TableRow key={pkg.id}>
                                     <TableCell className="font-medium">{pkg.name}</TableCell>
                                     <TableCell>{formatCurrency(pkg.price)}</TableCell>

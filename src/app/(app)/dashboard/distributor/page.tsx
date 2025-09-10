@@ -33,11 +33,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Users, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { distributorTiers } from "@/lib/config";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
-type Tier = typeof distributorTiers[0];
+interface DistributorTier {
+  id: string;
+  level: string;
+  monthlyIncome: number;
+  purchasedProducts: number;
+  deposit: number;
+}
 
 interface DistributorData {
     referredUsersCount: number;
@@ -49,10 +56,29 @@ interface DistributorData {
 export default function DistributorPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [distributorTiers, setDistributorTiers] = useState<DistributorTier[]>([]);
+  const [loadingTiers, setLoadingTiers] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
+  const [selectedTier, setSelectedTier] = useState<DistributorTier | null>(null);
   const [distributorData, setDistributorData] = useState<DistributorData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedTiers: DistributorTier[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedTiers.push({ id: doc.id, ...doc.data() } as DistributorTier);
+        });
+        setDistributorTiers(fetchedTiers);
+        setLoadingTiers(false);
+    }, (error) => {
+        console.error("Error fetching tiers:", error);
+        setLoadingTiers(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -75,7 +101,7 @@ export default function DistributorPage() {
     }
   }, [user]);
   
-  const handleApplyClick = (tier: Tier) => {
+  const handleApplyClick = (tier: DistributorTier) => {
     if (!distributorData || distributorData.userBalance < tier.deposit) {
       toast({
         variant: "destructive",
@@ -185,7 +211,9 @@ export default function DistributorPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {distributorTiers.map((tier) => (
+                {loadingTiers ? (
+                    <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
+                ) : distributorTiers.map((tier) => (
                   <TableRow key={tier.level}>
                     <TableCell className="font-medium">
                       <Badge variant="secondary">{tier.level}</Badge>

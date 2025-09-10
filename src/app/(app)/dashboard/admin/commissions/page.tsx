@@ -33,7 +33,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Loader2, PlusCircle, Trash2 } from "lucide-react";
-import { commissionTiers as initialTiers } from "@/lib/config";
 import { formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -46,6 +45,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+
 
 const tierSchema = z.object({
   referrals: z.coerce.number().int().positive("Referrals must be a positive integer."),
@@ -53,19 +56,34 @@ const tierSchema = z.object({
 });
 
 type TierFormValues = z.infer<typeof tierSchema>;
-type CommissionTier = TierFormValues & { id: number };
+type CommissionTier = TierFormValues & { id: string };
 
 export default function ManageCommissionsPage() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [tiers, setTiers] = useState<CommissionTier[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
-    // --- Backend Fetching Placeholder ---
-    // const fetchedTiers = await getCommissionTiers();
-    // setTiers(fetchedTiers);
-    setTiers(initialTiers.map((p) => ({ ...p, id: p.referrals })));
-  }, []);
+    if (!isAdmin) return;
+
+    const q = query(collection(db, "commissionTiers"), orderBy("referrals"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedTiers: CommissionTier[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedTiers.push({ id: doc.id, ...doc.data() } as CommissionTier);
+      });
+      setTiers(fetchedTiers);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching commission tiers:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch commission tiers." });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, toast]);
 
   const form = useForm<TierFormValues>({
     resolver: zodResolver(tierSchema),
@@ -76,15 +94,10 @@ export default function ManageCommissionsPage() {
   });
 
   async function onSubmit(values: TierFormValues) {
-    setLoading(true);
+    setFormLoading(true);
     try {
-      // --- Backend Logic Placeholder ---
-      // await addCommissionTier(values);
-      const newTier = { ...values, id: values.referrals };
-      
-      setTiers((prev) => [...prev, newTier].sort((a, b) => a.referrals - b.referrals));
+      await addDoc(collection(db, "commissionTiers"), values);
       form.reset();
-
       toast({
         title: "Tier Added",
         description: `Commission tier for ${values.referrals} referrals has been created.`,
@@ -96,15 +109,13 @@ export default function ManageCommissionsPage() {
         description: "Could not add the tier. Please try again.",
       });
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   }
 
-  const handleDelete = async (tierId: number) => {
+  const handleDelete = async (tierId: string) => {
     try {
-        // --- Backend Logic Placeholder ---
-        // await deleteCommissionTier(tierId);
-        setTiers((prev) => prev.filter((p) => p.id !== tierId));
+        await deleteDoc(doc(db, "commissionTiers", tierId));
         toast({
             title: "Tier Deleted",
             description: "The commission tier has been removed.",
@@ -147,8 +158,8 @@ export default function ManageCommissionsPage() {
                   )} />
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
+                  <Button type="submit" disabled={formLoading}>
+                    {formLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
                     Add Tier
                   </Button>
                 </CardFooter>
@@ -174,7 +185,9 @@ export default function ManageCommissionsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {tiers.length > 0 ? tiers.map((tier) => (
+                            {loading ? (
+                                <TableRow><TableCell colSpan={3} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
+                            ) : tiers.length > 0 ? tiers.map((tier) => (
                                 <TableRow key={tier.id}>
                                     <TableCell className="font-medium">{tier.referrals}+</TableCell>
                                     <TableCell>{formatCurrency(tier.commission)}</TableCell>

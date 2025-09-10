@@ -15,16 +15,43 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
-import { silverLevelPackages } from "@/lib/config";
 import { db } from "@/lib/firebase";
-import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot } from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+
+interface InvestmentPackage {
+  id: string;
+  name: string;
+  price: number;
+  dailyReturn: number;
+  duration: number;
+  totalReturn: number;
+}
 
 export default function InvestPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [silverLevelPackages, setSilverLevelPackages] = useState<InvestmentPackage[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
   const [userBalance, setUserBalance] = useState(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [isInvesting, setIsInvesting] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, "silverLevelPackages"), orderBy("price"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedPackages: InvestmentPackage[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedPackages.push({ id: doc.id, ...doc.data() } as InvestmentPackage);
+        });
+        setSilverLevelPackages(fetchedPackages);
+        setLoadingPackages(false);
+    }, (error) => {
+        console.error("Error fetching packages:", error);
+        setLoadingPackages(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -45,9 +72,9 @@ export default function InvestPage() {
     }
   }, [user]);
 
-  const handleInvestment = async (packageName: string, price: number, dailyReturn: number, duration: number, totalReturn: number) => {
+  const handleInvestment = async (pkg: InvestmentPackage) => {
     if (!user) return toast({ variant: "destructive", title: "Not Authenticated" });
-    if (userBalance < price) {
+    if (userBalance < pkg.price) {
         toast({
             variant: "destructive",
             title: "Insufficient Funds",
@@ -56,7 +83,7 @@ export default function InvestPage() {
         return;
     }
 
-    setIsInvesting(packageName);
+    setIsInvesting(pkg.id);
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -64,20 +91,20 @@ export default function InvestPage() {
         const userStatsDoc = await transaction.get(userStatsDocRef);
 
         const currentBalance = userStatsDoc.exists() ? userStatsDoc.data().availableBalance : 0;
-        if (currentBalance < price) {
+        if (currentBalance < pkg.price) {
           throw new Error("Insufficient funds.");
         }
 
-        const newBalance = currentBalance - price;
+        const newBalance = currentBalance - pkg.price;
         transaction.set(userStatsDocRef, { availableBalance: newBalance }, { merge: true });
 
         const investmentDocRef = collection(db, "users", user.uid, "investments");
         transaction.set(doc(investmentDocRef), {
-            name: packageName,
-            price,
-            dailyReturn,
-            duration,
-            totalReturn,
+            name: pkg.name,
+            price: pkg.price,
+            dailyReturn: pkg.dailyReturn,
+            duration: pkg.duration,
+            totalReturn: pkg.totalReturn,
             startDate: serverTimestamp(),
             status: "active",
         });
@@ -85,7 +112,7 @@ export default function InvestPage() {
 
       toast({
           title: "Investment Successful!",
-          description: `You have invested in ${packageName}.`,
+          description: `You have invested in ${pkg.name}.`,
       });
 
     } catch (error: any) {
@@ -109,9 +136,11 @@ export default function InvestPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {silverLevelPackages.map((pkg) => (
+        {loadingPackages ? (
+          Array.from({ length: 4 }).map((_, i) => <Card key={i}><CardContent className="p-6"><Loader2 className="animate-spin"/></CardContent></Card>)
+        ) : silverLevelPackages.map((pkg) => (
           <Card
-            key={pkg.name}
+            key={pkg.id}
             className="flex flex-col transform hover:scale-105 transition-transform duration-300"
           >
             <CardHeader>
@@ -137,17 +166,17 @@ export default function InvestPage() {
             <CardFooter>
               <Button 
                 className="w-full bg-foreground text-background hover:bg-foreground/90"
-                onClick={() => handleInvestment(pkg.name, pkg.price, pkg.dailyReturn, pkg.duration, pkg.totalReturn)}
-                disabled={isLoadingBalance || isInvesting === pkg.name}
+                onClick={() => handleInvestment(pkg)}
+                disabled={isLoadingBalance || isInvesting === pkg.id}
               >
-                {isInvesting === pkg.name ? <Loader2 className="animate-spin" /> : "Invest Now"}
+                {isInvesting === pkg.id ? <Loader2 className="animate-spin" /> : "Invest Now"}
               </Button>
             </CardFooter>
           </Card>
         ))}
       </div>
 
-      {silverLevelPackages.length === 0 && (
+      {!loadingPackages && silverLevelPackages.length === 0 && (
         <Card>
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">

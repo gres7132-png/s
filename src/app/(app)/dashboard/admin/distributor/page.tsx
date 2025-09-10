@@ -33,7 +33,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Loader2, PlusCircle, Trash2 } from "lucide-react";
-import { distributorTiers as initialTiers } from "@/lib/config";
 import { formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -47,6 +46,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 
 const tierSchema = z.object({
   level: z.string().min(1, "Level identifier is required (e.g., V1)."),
@@ -60,15 +62,30 @@ type DistributorTier = TierFormValues & { id: string };
 
 export default function ManageDistributorPage() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [tiers, setTiers] = useState<DistributorTier[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
-    // --- Backend Fetching Placeholder ---
-    // const fetchedTiers = await getDistributorTiers();
-    // setTiers(fetchedTiers);
-    setTiers(initialTiers.map((p) => ({ ...p, id: p.level })));
-  }, []);
+    if (!isAdmin) return;
+
+    const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedTiers: DistributorTier[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedTiers.push({ id: doc.id, ...doc.data() } as DistributorTier);
+        });
+        setTiers(fetchedTiers);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching tiers:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch distributor tiers." });
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, toast]);
 
   const form = useForm<TierFormValues>({
     resolver: zodResolver(tierSchema),
@@ -81,15 +98,10 @@ export default function ManageDistributorPage() {
   });
 
   async function onSubmit(values: TierFormValues) {
-    setLoading(true);
+    setFormLoading(true);
     try {
-      // --- Backend Logic Placeholder ---
-      // const newTierId = await addDistributorTier(values);
-      const newTier = { ...values, id: values.level };
-      
-      setTiers((prev) => [...prev, newTier]);
+      await addDoc(collection(db, "distributorTiers"), values);
       form.reset();
-
       toast({
         title: "Tier Added",
         description: `Distributor level ${values.level} has been successfully created.`,
@@ -101,15 +113,13 @@ export default function ManageDistributorPage() {
         description: "Could not add the tier. Please try again.",
       });
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   }
 
   const handleDelete = async (tierId: string) => {
     try {
-        // --- Backend Logic Placeholder ---
-        // await deleteDistributorTier(tierId);
-        setTiers((prev) => prev.filter((p) => p.id !== tierId));
+        await deleteDoc(doc(db, "distributorTiers", tierId));
         toast({
             title: "Tier Deleted",
             description: "The distributor tier has been removed.",
@@ -158,8 +168,8 @@ export default function ManageDistributorPage() {
                   )} />
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
+                  <Button type="submit" disabled={formLoading}>
+                    {formLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
                     Add Tier
                   </Button>
                 </CardFooter>
@@ -187,7 +197,9 @@ export default function ManageDistributorPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {tiers.length > 0 ? tiers.map((tier) => (
+                             {loading ? (
+                                <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
+                            ) : tiers.length > 0 ? tiers.map((tier) => (
                                 <TableRow key={tier.id}>
                                     <TableCell><Badge variant="secondary">{tier.level}</Badge></TableCell>
                                     <TableCell>{formatCurrency(tier.monthlyIncome)}</TableCell>
