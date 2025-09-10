@@ -16,7 +16,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { silverLevelPackages } from "@/lib/config";
-
+import { db } from "@/lib/firebase";
+import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot } from "firebase/firestore";
 
 export default function InvestPage() {
   const { toast } = useToast();
@@ -27,21 +28,25 @@ export default function InvestPage() {
 
   useEffect(() => {
     if (user) {
-      // --- Backend Data Fetching Placeholder ---
-      const fetchBalance = async () => {
-        setIsLoadingBalance(true);
-        // Example: const balance = await getUserBalance(user.uid);
-        
-        // In a real app, you would fetch the balance from your backend
-        // For now, we'll start with 0 until it's fetched.
-        setUserBalance(0); 
+      const userStatsDocRef = doc(db, "userStats", user.uid);
+      const unsubscribe = onSnapshot(userStatsDocRef, (doc) => {
+        if (doc.exists()) {
+          setUserBalance(doc.data().availableBalance || 0);
+        } else {
+          setUserBalance(0);
+        }
         setIsLoadingBalance(false);
-      };
-      fetchBalance();
+      }, (error) => {
+        console.error("Error fetching user balance:", error);
+        setIsLoadingBalance(false);
+      });
+      
+      return () => unsubscribe();
     }
   }, [user]);
 
-  const handleInvestment = async (packageName: string, price: number) => {
+  const handleInvestment = async (packageName: string, price: number, dailyReturn: number, duration: number, totalReturn: number) => {
+    if (!user) return toast({ variant: "destructive", title: "Not Authenticated" });
     if (userBalance < price) {
         toast({
             variant: "destructive",
@@ -54,24 +59,40 @@ export default function InvestPage() {
     setIsInvesting(packageName);
 
     try {
-      // --- Backend Logic Placeholder ---
-      // Here you would call your backend function to process the investment.
-      // Example: await processInvestment(user.uid, packageName, price);
-      console.log(`Processing investment for ${packageName}...`);
-      
+      await runTransaction(db, async (transaction) => {
+        const userStatsDocRef = doc(db, "userStats", user.uid);
+        const userStatsDoc = await transaction.get(userStatsDocRef);
 
-      // On success, update user balance and show a success message
-      setUserBalance(prev => prev - price);
+        const currentBalance = userStatsDoc.exists() ? userStatsDoc.data().availableBalance : 0;
+        if (currentBalance < price) {
+          throw new Error("Insufficient funds.");
+        }
+
+        const newBalance = currentBalance - price;
+        transaction.set(userStatsDocRef, { availableBalance: newBalance }, { merge: true });
+
+        const investmentDocRef = collection(db, "users", user.uid, "investments");
+        transaction.set(doc(investmentDocRef), {
+            name: packageName,
+            price,
+            dailyReturn,
+            duration,
+            totalReturn,
+            startDate: serverTimestamp(),
+            status: "active",
+        });
+      });
+
       toast({
           title: "Investment Successful!",
           description: `You have invested in ${packageName}.`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
        toast({
             variant: "destructive",
             title: "Investment Failed",
-            description: "Could not process your investment. Please try again.",
+            description: error.message || "Could not process your investment. Please try again.",
         });
     } finally {
         setIsInvesting(null);
@@ -116,7 +137,7 @@ export default function InvestPage() {
             <CardFooter>
               <Button 
                 className="w-full bg-foreground text-background hover:bg-foreground/90"
-                onClick={() => handleInvestment(pkg.name, pkg.price)}
+                onClick={() => handleInvestment(pkg.name, pkg.price, pkg.dailyReturn, pkg.duration, pkg.totalReturn)}
                 disabled={isLoadingBalance || isInvesting === pkg.name}
               >
                 {isInvesting === pkg.name ? <Loader2 className="animate-spin" /> : "Invest Now"}

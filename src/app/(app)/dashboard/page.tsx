@@ -21,6 +21,8 @@ import {
 import LatestTransactions from "@/components/latest-transactions";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 interface UserStats {
   availableBalance: number;
@@ -36,23 +38,26 @@ export default function DashboardPage() {
   
   useEffect(() => {
     if (user) {
-      // --- Backend Data Fetching Placeholder ---
-      const fetchStats = async () => {
-        setLoading(true);
-        // In a real application, you would fetch this data from your backend.
-        // Example: const userStats = await getStatsForUser(user.uid);
-        
-        // const mockStats: UserStats = {
-        //   availableBalance: 52340,
-        //   todaysEarnings: 166,
-        //   rechargeAmount: 1300,
-        //   withdrawalAmount: 0,
-        // };
-        // setStats(mockStats);
-        
+      const userStatsDocRef = doc(db, "userStats", user.uid);
+      const unsubscribe = onSnapshot(userStatsDocRef, (doc) => {
+        if (doc.exists()) {
+          setStats(doc.data() as UserStats);
+        } else {
+          // If no stats document exists, set default/initial stats
+          setStats({
+            availableBalance: 0,
+            todaysEarnings: 0,
+            rechargeAmount: 0,
+            withdrawalAmount: 0,
+          });
+        }
         setLoading(false);
-      };
-      fetchStats();
+      }, (error) => {
+        console.error("Error fetching user stats:", error);
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
     }
   }, [user]);
 
