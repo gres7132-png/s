@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -24,6 +24,8 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, getDocs } from "firebase/firestore";
 
 // This interface defines the structure for a referred user object.
 interface ReferredUser {
@@ -41,21 +43,51 @@ export default function ReferralsPage() {
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchReferredUsers = useCallback(async (userId: string) => {
+    setLoading(true);
+    const referralsColRef = collection(db, "users", userId, "referrals");
+    const referralsQuery = query(referralsColRef);
+
+    const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
+      const users: ReferredUser[] = [];
+      for (const doc of snapshot.docs) {
+        const referredUserId = doc.id;
+        const referredUserData = doc.data();
+
+        // Now, get the total investment for this referred user
+        const investmentsColRef = collection(db, "users", referredUserId, "investments");
+        const investmentsSnapshot = await getDocs(investmentsColRef);
+        
+        let totalInvested = 0;
+        investmentsSnapshot.forEach(investmentDoc => {
+          totalInvested += investmentDoc.data().price || 0;
+        });
+
+        const commission = totalInvested * 0.05; // 5% commission
+        const status: 'Active' | 'Pending' = totalInvested > 0 ? 'Active' : 'Pending';
+
+        users.push({
+          id: referredUserId,
+          name: referredUserData.displayName,
+          capital: totalInvested,
+          commission: commission,
+          status: status,
+        });
+      }
+      setReferredUsers(users);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
   useEffect(() => {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
-      
-      // --- Backend Data Fetching Placeholder ---
-      const fetchReferredUsers = async () => {
-        setLoading(true);
-        // Example: const users = await getReferredUsers(user.uid);
-        // setReferredUsers(users);
-        setReferredUsers([]); // A new user starts with an empty list of referrals.
-        setLoading(false);
-      };
-      fetchReferredUsers();
+      const unsub = fetchReferredUsers(user.uid);
+      return () => { unsub.then(u => u()) };
     }
-  }, [user]);
+  }, [user, fetchReferredUsers]);
 
   const copyToClipboard = () => {
     if (!referralLink) return;
@@ -155,7 +187,7 @@ export default function ReferralsPage() {
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         You have not referred any users yet.
                     </TableCell>
                 </TableRow>
@@ -167,3 +199,4 @@ export default function ReferralsPage() {
     </div>
   );
 }
+
