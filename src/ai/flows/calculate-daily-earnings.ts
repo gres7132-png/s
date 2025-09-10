@@ -1,0 +1,106 @@
+
+'use server';
+
+/**
+ * @fileOverview A secure backend flow for calculating and crediting daily earnings for all users.
+ * This flow is designed to be run once daily by a scheduled job (cron).
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getApps, initializeApp, cert } from 'firebase-admin/app';
+
+// Initialize Firebase Admin SDK
+if (!getApps().length) {
+  try {
+    initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG!))
+    });
+  } catch (e) {
+    console.error("Admin SDK initialization failed. Ensure FIREBASE_ADMIN_SDK_CONFIG is set in your environment.");
+  }
+}
+
+const db = getFirestore();
+
+interface Investment {
+    dailyReturn: number;
+    userId: string;
+}
+
+export const CalculateEarningsOutputSchema = z.object({
+    success: z.boolean(),
+    processedUsers: z.number(),
+    totalEarningsCredited: z.number(),
+});
+
+export type CalculateEarningsOutput = z.infer<typeof CalculateEarningsOutputSchema>;
+
+async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
+    if (!getApps().length) {
+        throw new Error("Admin SDK not initialized. Cannot perform backend operations.");
+    }
+    console.log("Starting daily earnings calculation...");
+
+    const earningsByUId: { [key: string]: number } = {};
+
+    // 1. Fetch all active investments across all users
+    const investmentsSnapshot = await db.collectionGroup('investments').where('status', '==', 'active').get();
+    
+    if (investmentsSnapshot.empty) {
+        console.log("No active investments found. Nothing to process.");
+        return { success: true, processedUsers: 0, totalEarningsCredited: 0 };
+    }
+
+    // 2. Sum up daily returns for each user
+    investmentsSnapshot.forEach(doc => {
+        const investment = doc.data();
+        const userId = doc.ref.parent.parent!.id; // Get the userId from the path
+        if (userId && investment.dailyReturn) {
+            earningsByUId[userId] = (earningsByUId[userId] || 0) + investment.dailyReturn;
+        }
+    });
+
+    // 3. Use a batch write to update all users' stats atomically
+    const batch = db.batch();
+    let totalCredited = 0;
+
+    for (const userId in earningsByUId) {
+        const userStatsRef = db.doc(`userStats/${userId}`);
+        const dailyEarning = earningsByUId[userId];
+        
+        batch.update(userStatsRef, {
+            availableBalance: admin.firestore.FieldValue.increment(dailyEarning),
+            todaysEarnings: dailyEarning // Set, not increment, to reflect today's specific earnings
+        });
+        
+        totalCredited += dailyEarning;
+    }
+
+    // Reset earnings for users who had earnings yesterday but not today
+    const allUsersWithStatsSnapshot = await db.collection('userStats').where('todaysEarnings', '>', 0).get();
+    allUsersWithStatsSnapshot.forEach(doc => {
+        if (!earningsByUId[doc.id]) {
+            batch.update(doc.ref, { todaysEarnings: 0 });
+        }
+    });
+
+    await batch.commit();
+    
+    console.log(`Successfully processed earnings for ${Object.keys(earningsByUId).length} users.`);
+    return {
+        success: true,
+        processedUsers: Object.keys(earningsByUId).length,
+        totalEarningsCredited: totalCredited
+    };
+}
+
+
+export const calculateAllUserEarnings = ai.defineFlow(
+  {
+    name: 'calculateAllUserEarnings',
+    outputSchema: CalculateEarningsOutputSchema,
+  },
+  calculateAndCreditEarnings
+);
