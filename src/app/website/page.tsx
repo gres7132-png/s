@@ -12,18 +12,18 @@ export default function WebstitePage() {
   const features = [
     {
       icon: <Cpu className="h-10 w-10 text-primary" />,
-      title: "High-Performance Rigs",
-      description: "We invest in and maintain state-of-the-art crypto mining rigs to maximize efficiency and returns."
+      title: "1. You Invest",
+      description: "Choose an investment package that aligns with your financial goals. Longer investment periods yield greater returns."
     },
     {
       icon: <Zap className="h-10 w-10 text-primary" />,
-      title: "Optimized Energy",
-      description: "Our operations are strategically placed to access stable and cost-effective electricity, a critical component for profitability."
+      title: "2. We Operate",
+      description: "Your investment is pooled to cover the critical operational costs of our mining fleet, primarily electricity and hardware maintenance."
     },
     {
       icon: <DollarSign className="h-10 w-10 text-primary" />,
-      title: "Daily Returns",
-      description: "Your investment contributes to the operational uptime of our rigs, and you earn a share of the daily mining revenue."
+      title: "3. You Earn",
+      description: "Our rigs generate up to $20,000 in crypto value daily. You receive a consistent share of these earnings directly to your account."
     }
   ];
 
@@ -50,16 +50,16 @@ export default function WebstitePage() {
                 <div className="space-y-4">
                     <h2 className="text-3xl font-bold tracking-tight">What is YieldLink?</h2>
                     <p className="text-muted-foreground">
-                        YieldLink is a forward-thinking investment company specializing in cryptocurrency mining. We own and operate a large fleet of high-performance mining rigs designed to solve complex cryptographic problems and earn digital currency rewards.
+                        YieldLink is a forward-thinking investment company specializing in cryptocurrency mining. We own and operate a large fleet of high-performance mining rigs—powerful computers specifically designed to generate new cryptocurrency.
                     </p>
                     <p className="text-muted-foreground">
-                        Our business model is simple: we leverage investor capital to maintain and expand our mining operations. This includes covering the costs of electricity, cooling, and hardware upkeep. In return for their contribution to our operational capacity, our investors receive a consistent daily income based on the performance of our mining fleet.
+                        Our business model is simple: we leverage investor capital to maintain and expand our mining operations. This includes covering the significant costs of electricity, cooling, and hardware upkeep. In return for their contribution to our operational capacity, our investors receive a consistent daily income based on the performance of our mining fleet.
                     </p>
                 </div>
                  <div>
                     <Image
                         src={placeholderImages.cryptoFarm.src}
-                        alt="Crypto mining farm"
+                        alt="A row of crypto mining rigs"
                         width={placeholderImages.cryptoFarm.width}
                         height={placeholderImages.cryptoFarm.height}
                         className="rounded-lg shadow-lg"
@@ -73,7 +73,7 @@ export default function WebstitePage() {
          <section id="features" className="py-16 md:py-24 bg-secondary">
             <div className="container mx-auto px-4">
                  <div className="text-center space-y-4 mb-12">
-                     <h2 className="text-3xl font-bold tracking-tight">How It Works</h2>
+                     <h2 className="text-3xl font-bold tracking-tight">How You Profit From Our Power</h2>
                      <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
                         We've streamlined the process of earning from crypto mining into three simple steps.
                      </p>
