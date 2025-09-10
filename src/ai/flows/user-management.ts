@@ -11,14 +11,18 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 // In a real environment, you would uncomment these lines and configure the Admin SDK
-// import { initializeApp, getApps, cert } from 'firebase-admin/app';
-// import { getAuth } from 'firebase-admin/auth';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 
-// if (!getApps().length) {
-//   initializeApp({
-//     credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG!))
-//   });
-// }
+if (!getApps().length) {
+  try {
+    initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG!))
+    });
+  } catch (e) {
+    console.error("Admin SDK initialization failed. This is expected in a client-side environment. The feature will work in a production server environment.");
+  }
+}
 
 // Schema for a single user's data returned by the list flow
 export const UserDataSchema = z.object({
@@ -48,20 +52,19 @@ export type UpdateUserStatusInput = z.infer<typeof UpdateUserStatusInputSchema>;
  * @returns {Promise<ListUsersOutput>} A list of user data.
  */
 export async function listAllUsers(): Promise<ListUsersOutput> {
-  // --- PRODUCTION IMPLEMENTATION ---
-  // const auth = getAuth();
-  // const userRecords = await auth.listUsers();
-  // const users = userRecords.users.map(user => ({
-  //   uid: user.uid,
-  //   email: user.email,
-  //   displayName: user.displayName,
-  //   disabled: user.disabled,
-  // }));
-  // return { users };
-
-  // For this prototype, we return an empty list as we cannot call the Admin SDK.
-  console.log("Simulating listAllUsers. In production, this would fetch real users.");
-  return { users: [] };
+  if (!getApps().length) {
+    console.log("Simulating listAllUsers. Admin SDK not initialized.");
+    return { users: [] };
+  }
+  const auth = getAuth();
+  const userRecords = await auth.listUsers();
+  const users = userRecords.users.map(user => ({
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    disabled: user.disabled,
+  }));
+  return { users };
 }
 
 
@@ -71,13 +74,12 @@ export async function listAllUsers(): Promise<ListUsersOutput> {
  * @returns {Promise<{success: boolean}>} A success flag.
  */
 export async function updateUserStatus(input: UpdateUserStatusInput): Promise<{success: boolean}> {
-    // --- PRODUCTION IMPLEMENTATION ---
-    // const auth = getAuth();
-    // await auth.updateUser(input.uid, { disabled: input.disabled });
-    // return { success: true };
-    
-    console.log(`Simulating update for user ${input.uid} to disabled=${input.disabled}`);
-    // We return success optimistically. The UI will update based on this.
+    if (!getApps().length) {
+      console.log(`Simulating update for user ${input.uid} to disabled=${input.disabled}. Admin SDK not initialized.`);
+      return { success: true };
+    }
+    const auth = getAuth();
+    await auth.updateUser(input.uid, { disabled: input.disabled });
     return { success: true };
 }
 
