@@ -23,7 +23,8 @@ import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, getDocs, collection, query, where, Timestamp, runTransaction } from "firebase/firestore";
-import { isToday, isBefore, startOfDay } from 'date-fns';
+import { isBefore, startOfDay } from 'date-fns';
+import AiSuggestions from "@/components/ai-suggestions";
 
 interface UserStats {
   availableBalance: number;
@@ -136,6 +137,8 @@ export default function DashboardPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Control Panel</h1>
       </div>
+      
+      <AiSuggestions />
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
@@ -189,7 +192,7 @@ export default function DashboardPage() {
               1: After waiting for 24 hours, you can withdraw the income from purchasing company products, and you can withdraw cash immediately without any requirements.
             </p>
             <p>
-              2: The company's withdrawal fee needs to deduct 15% tax, because the company is an American company and needs to pay taxes to the United States. However, the company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
+              2: The company's withdrawal fee needs to deduct 10% tax, because the company is an American company and needs to pay taxes to the United States. However, the company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
             </p>
             <p>
               3: You only need to have one account in the company, and multiple accounts are not allowed. The system will automatically block members with multiple accounts.
@@ -202,3 +205,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
