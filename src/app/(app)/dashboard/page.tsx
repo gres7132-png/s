@@ -19,10 +19,11 @@ import {
   DollarSign,
 } from "lucide-react";
 import LatestTransactions from "@/components/latest-transactions";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, getDocs, collection, query, where, Timestamp, runTransaction } from "firebase/firestore";
+import { isToday, isBefore, startOfDay } from 'date-fns';
 
 interface UserStats {
   availableBalance: number;
@@ -31,19 +32,88 @@ interface UserStats {
   withdrawalAmount: number;
 }
 
+interface Investment {
+    dailyReturn: number;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   
+  const calculateAndCreditEarnings = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const earningsLogRef = doc(db, "earningsLog", user.uid);
+        const earningsLogDoc = await transaction.get(earningsLogRef);
+
+        const lastCalculated = earningsLogDoc.exists() 
+          ? (earningsLogDoc.data().lastCalculated as Timestamp).toDate()
+          : new Date(0); // The epoch
+
+        // Only run if the last calculation was before today
+        if (isBefore(lastCalculated, startOfDay(new Date()))) {
+            const investmentsQuery = query(collection(db, "users", user.uid, "investments"), where("status", "==", "active"));
+            const investmentsSnapshot = await getDocs(investmentsQuery);
+
+            if (investmentsSnapshot.empty) {
+                // If there are no investments, just update the log and reset today's earnings
+                const userStatsRef = doc(db, "userStats", user.uid);
+                const userStatsDoc = await transaction.get(userStatsRef);
+                if(userStatsDoc.exists() && userStatsDoc.data().todaysEarnings > 0) {
+                   transaction.update(userStatsRef, { todaysEarnings: 0 });
+                }
+                transaction.set(earningsLogRef, { lastCalculated: new Date() }, { merge: true });
+                return;
+            };
+
+            const totalDailyReturn = investmentsSnapshot.docs.reduce((sum, doc) => {
+                const investment = doc.data() as Investment;
+                return sum + (investment.dailyReturn || 0);
+            }, 0);
+
+            if (totalDailyReturn > 0) {
+                const userStatsRef = doc(db, "userStats", user.uid);
+                const userStatsDoc = await transaction.get(userStatsRef);
+
+                if (!userStatsDoc.exists()) {
+                    console.error("User stats not found, cannot credit earnings.");
+                    return;
+                }
+
+                const currentStats = userStatsDoc.data() as UserStats;
+                const newBalance = currentStats.availableBalance + totalDailyReturn;
+
+                transaction.update(userStatsRef, {
+                    availableBalance: newBalance,
+                    todaysEarnings: totalDailyReturn
+                });
+            } else {
+                 // Reset todaysEarnings if no active returns
+                const userStatsRef = doc(db, "userStats", user.uid);
+                transaction.update(userStatsRef, { todaysEarnings: 0 });
+            }
+            
+            // Update the log regardless
+            transaction.set(earningsLogRef, { lastCalculated: new Date() }, { merge: true });
+        }
+      });
+    } catch (error) {
+      console.error("Failed to calculate and credit daily earnings:", error);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (user) {
+      calculateAndCreditEarnings();
+
       const userStatsDocRef = doc(db, "userStats", user.uid);
       const unsubscribe = onSnapshot(userStatsDocRef, (doc) => {
         if (doc.exists()) {
           setStats(doc.data() as UserStats);
         } else {
-          // If no stats document exists, set default/initial stats
           setStats({
             availableBalance: 0,
             todaysEarnings: 0,
@@ -59,7 +129,7 @@ export default function DashboardPage() {
 
       return () => unsubscribe();
     }
-  }, [user]);
+  }, [user, calculateAndCreditEarnings]);
 
   return (
     <div className="flex flex-col gap-8">
