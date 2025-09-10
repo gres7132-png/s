@@ -231,7 +231,7 @@ export default function TransactionsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Deposit Proofs</CardTitle>
-                    <CardDescription>Users submit these proofs after making a deposit. Approve to credit their account.</CardDescription>
+                    <CardDescription>Users submit these proofs after making a deposit. You must manually verify the payment in the corresponding payment system before approving. Approving will credit the user's account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -269,7 +269,7 @@ export default function TransactionsPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Withdrawal Requests</CardTitle>
-                    <CardDescription>Users request to withdraw funds. Approve to process the payment.</CardDescription>
+                    <CardDescription>Users request to withdraw funds. Verify the user's account and process the payment to their saved details. Approving will deduct the funds from their account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
