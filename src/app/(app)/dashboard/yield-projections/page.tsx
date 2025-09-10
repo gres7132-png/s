@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { collection, onSnapshot, query, where, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addMonths, format, startOfMonth } from 'date-fns';
+import { formatCurrency } from "@/lib/utils"
 
 interface Investment {
   id: string;
@@ -125,11 +126,23 @@ export default function YieldProjectionsPage() {
                         axisLine={false}
                     />
                     <YAxis
-                      tickFormatter={(value) => `KES ${value / 1000}k`}
+                      tickFormatter={(value) => {
+                        if (value >= 1000) {
+                            return `KES ${value / 1000}k`;
+                        }
+                        return `KES ${value}`;
+                      }}
                     />
                     <ChartTooltip
                         cursor={false}
-                        content={<ChartTooltipContent indicator="dot" />}
+                        content={<ChartTooltipContent indicator="dot" formatter={(value, name, props) => {
+                            return (
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="font-medium text-foreground">{formatCurrency(value as number)}</span>
+                                    <span className="text-muted-foreground text-xs capitalize">{name}</span>
+                                </div>
+                            )
+                        }} />}
                     />
                     <Bar dataKey="earnings" fill="var(--color-earnings)" radius={4} />
                     </BarChart>
