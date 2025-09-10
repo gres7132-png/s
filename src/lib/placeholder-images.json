@@ -5,5 +5,11 @@
         "width": 600,
         "height": 400,
         "hint": "mining rigs"
+    },
+    "serverRoom": {
+        "src": "https://picsum.photos/seed/serverroom/600/400",
+        "width": 600,
+        "height": 400,
+        "hint": "server room"
     }
 }

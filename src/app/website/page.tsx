@@ -1,15 +1,16 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Cpu, DollarSign, Zap } from "lucide-react";
+import { CheckCircle, Cpu, DollarSign, ShieldCheck, Headphones, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import placeholderImages from '@/lib/placeholder-images.json';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 export default function WebstitePage() {
 
-  const features = [
+  const howItWorksSteps = [
     {
       icon: <Cpu className="h-10 w-10 text-primary" />,
       title: "1. You Invest",
@@ -23,8 +24,50 @@ export default function WebstitePage() {
     {
       icon: <DollarSign className="h-10 w-10 text-primary" />,
       title: "3. You Earn",
-      description: "Our rigs generate up to $20,000 in crypto value daily. You receive a consistent share of these earnings directly to your account."
+      description: "Our rigs generate significant crypto value daily. You receive a consistent share of these earnings directly to your account."
     }
+  ];
+
+  const whyChooseUsFeatures = [
+    {
+      icon: <Cpu className="h-8 w-8 text-primary" />,
+      title: "Advanced Technology",
+      description: "We utilize the latest generation of ASIC miners to maximize efficiency and profitability, ensuring the best possible returns."
+    },
+    {
+        icon: <ShieldCheck className="h-8 w-8 text-primary" />,
+        title: "Security First",
+        description: "Your investments and data are protected with industry-leading security protocols and multi-layered protection."
+    },
+    {
+        icon: <DollarSign className="h-8 w-8 text-primary" />,
+        title: "Transparent Earnings",
+        description: "Track your daily earnings and watch your investment grow in real-time through your personal dashboard."
+    },
+    {
+        icon: <Headphones className="h-8 w-8 text-primary" />,
+        title: "Dedicated Support",
+        description: "Our expert support team is available via our official WhatsApp channel to assist you with any questions or concerns."
+    }
+  ];
+
+  const faqs = [
+    {
+      question: "Is my investment secure?",
+      answer: "Yes, security is our top priority. We use state-of-the-art cybersecurity measures to protect our infrastructure and your data. Furthermore, our operations are diversified across multiple locations to mitigate physical risks."
+    },
+    {
+        question: "How does YieldLink make money?",
+        answer: "Our revenue is generated directly from the cryptocurrency our mining fleet produces. A portion of these earnings is shared with our investors as their daily return, while the remainder covers our operational costs (electricity, maintenance, staffing) and our profit margin."
+    },
+    {
+        question: "What are the fees for withdrawal?",
+        answer: "We charge a standard 15% service fee on all withdrawals to cover transaction costs and contribute to our operational reserves. This ensures the sustainability of the platform. We also offer periodic fee-free withdrawal days as a bonus to our members."
+    },
+    {
+        question: "Can I have multiple accounts?",
+        answer: "No, to ensure fairness and compliance, we strictly enforce a policy of one account per person. Our system actively monitors for multiple account abuse, which can lead to suspension."
+    },
   ];
 
   return (
@@ -33,10 +76,10 @@ export default function WebstitePage() {
         <section className="py-20 md:py-32 bg-secondary">
             <div className="container mx-auto px-4 text-center">
                 <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-primary">
-                    Unlock the Power of Crypto Mining
+                    Unlock the Power of Industrial Crypto Mining
                 </h1>
                 <p className="mt-4 max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground">
-                    YieldLink gives you direct access to the returns of industrial-scale crypto mining. We manage the hardware, you enjoy the daily rewards.
+                    YieldLink gives you direct access to the returns of large-scale crypto mining. We manage the hardware and operations, you enjoy the daily rewards.
                 </p>
                 <Button asChild size="lg" className="mt-8">
                     <Link href="/auth">Get Started</Link>
@@ -50,10 +93,10 @@ export default function WebstitePage() {
                 <div className="space-y-4">
                     <h2 className="text-3xl font-bold tracking-tight">What is YieldLink?</h2>
                     <p className="text-muted-foreground">
-                        YieldLink is a forward-thinking investment company specializing in cryptocurrency mining. We own and operate a large fleet of high-performance mining rigs—powerful computers specifically designed to generate new cryptocurrency.
+                        YieldLink is a forward-thinking investment company specializing in cryptocurrency mining. We own and operate a large fleet of high-performance mining rigs—powerful computers specifically designed to solve complex cryptographic problems and generate new cryptocurrency.
                     </p>
                     <p className="text-muted-foreground">
-                        Our business model is simple: we leverage investor capital to maintain and expand our mining operations. This includes covering the significant costs of electricity, cooling, and hardware upkeep. In return for their contribution to our operational capacity, our investors receive a consistent daily income based on the performance of our mining fleet.
+                        Our business model is simple and transparent: we leverage investor capital to maintain and expand our mining operations. This includes covering the significant costs of electricity, cooling, and hardware upkeep. In return for their contribution to our operational capacity, our investors receive a consistent daily income based on the proven performance of our mining fleet.
                     </p>
                 </div>
                  <div>
@@ -69,7 +112,7 @@ export default function WebstitePage() {
             </div>
         </section>
 
-        {/* Features Section */}
+        {/* How It Works Section */}
          <section id="features" className="py-16 md:py-24 bg-secondary">
             <div className="container mx-auto px-4">
                  <div className="text-center space-y-4 mb-12">
@@ -79,7 +122,7 @@ export default function WebstitePage() {
                      </p>
                  </div>
                  <div className="grid md:grid-cols-3 gap-8">
-                    {features.map((feature) => (
+                    {howItWorksSteps.map((feature) => (
                         <Card key={feature.title} className="text-center">
                             <CardHeader>
                                 <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit">
@@ -95,16 +138,71 @@ export default function WebstitePage() {
                  </div>
             </div>
         </section>
+
+         {/* Why Choose Us Section */}
+        <section className="py-16 md:py-24">
+            <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
+                 <div>
+                    <Image
+                        src={placeholderImages.serverRoom.src}
+                        alt="Secure server room"
+                        width={placeholderImages.serverRoom.width}
+                        height={placeholderImages.serverRoom.height}
+                        className="rounded-lg shadow-lg"
+                        data-ai-hint={placeholderImages.serverRoom.hint}
+                    />
+                </div>
+                <div className="space-y-8">
+                    <div className="space-y-2">
+                        <h2 className="text-3xl font-bold tracking-tight">Why Choose YieldLink?</h2>
+                        <p className="text-muted-foreground">We are committed to providing a secure, transparent, and profitable platform for all our investors.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {whyChooseUsFeatures.map((feature) => (
+                            <div key={feature.title} className="flex items-start gap-4">
+                                {feature.icon}
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold">{feature.title}</h4>
+                                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section id="faq" className="py-16 md:py-24 bg-secondary">
+             <div className="container mx-auto px-4 max-w-3xl">
+                <div className="text-center space-y-4 mb-12">
+                     <h2 className="text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
+                     <p className="text-lg text-muted-foreground">
+                        Have questions? We have answers. Here are some of the most common queries from our investors.
+                     </p>
+                </div>
+                <Accordion type="single" collapsible className="w-full">
+                    {faqs.map((faq) => (
+                         <AccordionItem value={faq.question} key={faq.question}>
+                            <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
+                            <AccordionContent>
+                                {faq.answer}
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+             </div>
+        </section>
         
         {/* Call to Action Section */}
         <section className="py-20 md:py-32">
             <div className="container mx-auto px-4 text-center">
                  <h2 className="text-3xl font-bold tracking-tight">Ready to Start Earning?</h2>
                  <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground">
-                    Join YieldLink today and turn our mining power into your daily profit. Longer investment periods mean greater and more sustained returns.
+                    Join YieldLink today and turn our mining power into your daily profit. Create your account in minutes and make your first investment.
                 </p>
                  <Button asChild size="lg" className="mt-8">
-                    <Link href="/auth">Create Your Account</Link>
+                    <Link href="/auth">Create Your Account Now</Link>
                 </Button>
             </div>
         </section>
