@@ -1,0 +1,64 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // --- USER DATA RULES ---
+    // Users can only read/write their own data.
+    match /users/{userId} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+      
+      // A user can read their own referrals subcollection
+      match /referrals/{referralId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // A user can read their own investments subcollection
+      match /investments/{investmentId} {
+        allow read, write: if request.auth_ != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Users can only read/write their own stats, earnings log, and payment details
+    match /userStats/{userId} {
+       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /earningsLog/{userId} {
+       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+     match /userPaymentDetails/{userId} {
+       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- PUBLIC & ADMIN RULES ---
+    // Any authenticated user can see the list of packages and tiers
+    match /silverLevelPackages/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only manageable via Admin SDK
+    }
+     match /distributorTiers/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only manageable via Admin SDK
+    }
+     match /commissionTiers/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only manageable via Admin SDK
+    }
+
+    // --- TRANSACTION RULES ---
+    // Any authenticated user can see the latest transactions.
+    // They can create their own deposit/withdrawal requests.
+    match /transactionProofs/{proofId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if false; // Only manageable via Admin SDK
+    }
+    match /withdrawalRequests/{reqId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if false; // Only manageable via Admin SDK
+    }
+  }
+}
