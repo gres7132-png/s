@@ -97,10 +97,10 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
             }
 
         } else {
-             console.log("User not found in simulated list. This is expected.");
+             toast({ variant: "destructive", title: "User Not Found" });
         }
-    } catch(e) {
-        toast({ variant: "destructive", title: "Failed to fetch user data" });
+    } catch(e: any) {
+        toast({ variant: "destructive", title: "Failed to fetch user data", description: e.message });
     } finally {
         setLoading(false);
     }
@@ -154,9 +154,9 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         <div className="space-y-4 text-center pt-8">
             <Alert variant="destructive" className="max-w-md mx-auto">
                 <Info className="h-4 w-4" />
-                <AlertTitle>User Data Not Loaded</AlertTitle>
+                <AlertTitle>User Data Not Found</AlertTitle>
                 <AlertDescription>
-                   User data could not be loaded because the Firebase Admin SDK is not available in this prototype environment. This feature will work in production.
+                   Could not load data for this user. They may not exist or there may be an issue with your configuration.
                 </AlertDescription>
             </Alert>
         </div>
@@ -277,7 +277,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                                             <TableCell><Badge variant={r.status === 'Active' ? 'default' : 'secondary'}>{r.status}</Badge></TableCell>
                                         </TableRow>
                                     )) : <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No referrals found.</TableCell></TableRow>}
-                                </TableBody>
+                                </Body>
                             </Table>
                         </TabsContent>
                          <TabsContent value="deposits">

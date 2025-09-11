@@ -82,14 +82,6 @@ export default function UsersListPage() {
         </p>
       </div>
 
-       <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>Prototype Environment Notice</AlertTitle>
-        <AlertDescription>
-          This feature requires the Firebase Admin SDK, which cannot be used in this environment. Therefore, the user list will appear empty. The code is complete and will function in a production environment.
-        </AlertDescription>
-      </Alert>
-
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
