@@ -8,7 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 
 // Initialize Firebase Admin SDK
@@ -24,18 +24,13 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
-interface Investment {
-    dailyReturn: number;
-    userId: string;
-}
-
-export const CalculateEarningsOutputSchema = z.object({
+const CalculateEarningsOutputSchema = z.object({
     success: z.boolean(),
     processedUsers: z.number(),
     totalEarningsCredited: z.number(),
 });
 
-export type CalculateEarningsOutput = z.infer<typeof CalculateEarningsOutputSchema>;
+type CalculateEarningsOutput = z.infer<typeof CalculateEarningsOutputSchema>;
 
 async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
     if (!getApps().length) {
@@ -43,7 +38,7 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
     }
     console.log("Starting daily earnings calculation...");
 
-    const earningsByUId: { [key: string]: number } = {};
+    const earningsByUid: { [key: string]: number } = {};
 
     // 1. Fetch all active investments across all users
     const investmentsSnapshot = await db.collectionGroup('investments').where('status', '==', 'active').get();
@@ -58,40 +53,41 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
         const investment = doc.data();
         const userId = doc.ref.parent.parent!.id; // Get the userId from the path
         if (userId && investment.dailyReturn) {
-            earningsByUId[userId] = (earningsByUId[userId] || 0) + investment.dailyReturn;
+            earningsByUid[userId] = (earningsByUid[userId] || 0) + investment.dailyReturn;
         }
     });
 
     // 3. Use a batch write to update all users' stats atomically
     const batch = db.batch();
     let totalCredited = 0;
+    const userIdsWithEarningsToday = Object.keys(earningsByUid);
 
-    for (const userId in earningsByUId) {
+    for (const userId of userIdsWithEarningsToday) {
         const userStatsRef = db.doc(`userStats/${userId}`);
-        const dailyEarning = earningsByUId[userId];
+        const dailyEarning = earningsByUid[userId];
         
         batch.update(userStatsRef, {
-            availableBalance: admin.firestore.FieldValue.increment(dailyEarning),
+            availableBalance: FieldValue.increment(dailyEarning),
             todaysEarnings: dailyEarning // Set, not increment, to reflect today's specific earnings
         });
         
         totalCredited += dailyEarning;
     }
-
-    // Reset earnings for users who had earnings yesterday but not today
-    const allUsersWithStatsSnapshot = await db.collection('userStats').where('todaysEarnings', '>', 0).get();
-    allUsersWithStatsSnapshot.forEach(doc => {
-        if (!earningsByUId[doc.id]) {
+    
+    // 4. Asynchronously find users who had earnings yesterday but not today, and reset their earnings to 0.
+    const allUsersWithOldEarningsSnapshot = await db.collection('userStats').where('todaysEarnings', '>', 0).get();
+    allUsersWithOldEarningsSnapshot.forEach(doc => {
+        if (!userIdsWithEarningsToday.includes(doc.id)) {
             batch.update(doc.ref, { todaysEarnings: 0 });
         }
     });
 
     await batch.commit();
     
-    console.log(`Successfully processed earnings for ${Object.keys(earningsByUId).length} users.`);
+    console.log(`Successfully processed earnings for ${userIdsWithEarningsToday.length} users.`);
     return {
         success: true,
-        processedUsers: Object.keys(earningsByUId).length,
+        processedUsers: userIdsWithEarningsToday.length,
         totalEarningsCredited: totalCredited
     };
 }
