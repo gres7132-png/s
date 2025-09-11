@@ -119,7 +119,7 @@ export default function DashboardPage() {
               1: After waiting for 24 hours, you can withdraw the income from purchasing company products, and you can withdraw cash immediately without any requirements.
             </p>
             <p>
-              2: The company's withdrawal fee needs to deduct 10% tax, because the company is an American company and needs to pay taxes to the United States. However, the company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
+              2: The company's withdrawal requires a 15% service fee. However, the company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
             </p>
             <p>
               3: You only need to have one account in the company, and multiple accounts are not allowed. The system will automatically block members with multiple accounts.
@@ -132,3 +132,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

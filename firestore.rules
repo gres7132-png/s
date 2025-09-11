@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 // --- Admin Configuration ---
@@ -25,75 +24,66 @@ service cloud.firestore {
   match /databases/{database}/documents {
   
     // --- User Data ---
-    // Users can read/write their own document. Admins can read any user document.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if isOwner(userId);
     }
     
-    // --- User-Specific Subcollections ---
+    // --- User-Specific Subcollections (investments, referrals) ---
     match /users/{userId}/{collectionId}/{docId} {
-       // Users can manage their own subcollections (investments, referrals).
-       // Admins can read these subcollections for verification.
        allow read, write: if isOwner(userId);
+       // Admins can also read this data for support/verification
        allow read: if isAdmin();
     }
     
     // --- User Stats ---
-    // Users can read their own stats.
-    // Admins can read any user's stats and, crucially, can WRITE to them to update balances.
-    // The backend function (which runs as admin) also needs write access.
     match /userStats/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isAdmin(); // Admin can update balances.
+      // Only admins can directly write to stats (e.g., approving deposits)
+      allow write: if isAdmin();
     }
     
     // --- User Payment Details ---
-    // Only the user can create, read, and update their own sensitive payment details.
-    // Not even admins can read this directly from the client for security.
     match /userPaymentDetails/{userId} {
        allow read, write: if isOwner(userId);
     }
 
-    // --- Investment Packages (Publicly readable, Admin writable) ---
+    // --- Investment Packages (Admin Writable) ---
     match /silverLevelPackages/{packageId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // --- Distributor Tiers (Publicly readable, Admin writable) ---
+    // --- Distributor Tiers (Admin Writable) ---
     match /distributorTiers/{tierId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
     
-    // --- Commission Tiers (Publicly readable, Admin writable) ---
+    // --- Commission Tiers (Admin Writable) ---
     match /commissionTiers/{tierId} {
         allow read: if isAuthenticated();
         allow write: if isAdmin();
     }
 
     // --- Transaction Proofs (Deposits) ---
-    // Users can create their own deposit proofs.
-    // Admins can read all proofs and, crucially, can WRITE (update) the status.
     match /transactionProofs/{proofId} {
-        allow read: if isAdmin();
         allow create: if isAuthenticated();
-        allow update: if isAdmin(); // Allows admin to change status to 'approved'/'rejected'
+        allow read, update: if isAdmin() || isOwner(request.resource.data.userId);
     }
     
     // --- Withdrawal Requests ---
-    // Users can create their own withdrawal requests.
-    // Admins can read all requests and, crucially, can WRITE (update) the status.
     match /withdrawalRequests/{reqId} {
-        allow read: if isAdmin();
         allow create: if isAuthenticated();
-        allow update: if isAdmin(); // Allows admin to change status to 'approved'/'rejected'
+        allow read, update: if isAdmin() || isOwner(request.resource.data.userId);
     }
-    
-    // Allow earnings log writes from backend functions
-    match /earningsLog/{logId} {
-        allow read, write: if false; // Should only be accessed by trusted backend
+
+    // --- Distributor Purchases (Log for Admin) ---
+    // User can create through a transaction, admin can read the log.
+    match /distributorPurchases/{purchaseId} {
+        allow read: if isAdmin();
+        // Client-side writes are disallowed. Writes only happen via secure backend transaction.
+        allow write: if false; 
     }
   }
 }

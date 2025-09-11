@@ -25,13 +25,20 @@ export default function AdminPage() {
     }
   }, [isAdmin, loading, router]);
   
-  // While loading, we can show a skeleton or nothing to prevent content flash
-  if (loading || !isAdmin) {
+  // While loading auth status, show a spinner. Also, if the user is eventually
+  // found to be not an admin, they will be redirected, but this prevents
+  // a flash of content they shouldn't see.
+  if (loading) {
     return (
         <div className="flex items-center justify-center h-full">
             <ShieldAlert className="h-8 w-8 text-muted-foreground animate-pulse" />
         </div>
     );
+  }
+
+  // If after loading, the user is still not an admin, render nothing while redirect happens.
+  if (!isAdmin) {
+    return null;
   }
 
   const adminSections = [
@@ -102,3 +109,4 @@ export default function AdminPage() {
     </div>
   );
 }
+

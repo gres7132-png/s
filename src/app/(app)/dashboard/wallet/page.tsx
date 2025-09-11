@@ -270,17 +270,19 @@ export default function WalletPage() {
     </div>
   );
   
-  const MinipayDetailRow = ({ label, link, number }: { label: string; link: string; number: string }) => (
+  const MinipayDetailRow = ({ label, link, number }: { label: string; link?: string; number?: string }) => (
     <div className="flex items-center justify-between gap-4 py-3 border-b border-border/50">
       <div>
         <p className="text-sm font-semibold text-foreground">{label}</p>
-        <div className="flex items-center gap-2">
-            <LinkIcon className="h-4 w-4 text-muted-foreground" />
-            <Link href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline font-bold">
-                {link}
-            </Link>
-        </div>
-        <p className="text-sm text-muted-foreground break-all font-bold mt-1">Number: {number}</p>
+        {link && (
+            <div className="flex items-center gap-2">
+                <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                <Link href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline font-bold">
+                    {link}
+                </Link>
+            </div>
+        )}
+        {number && <p className="text-sm text-muted-foreground break-all font-bold mt-1">Number: {number}</p>}
       </div>
        <Button 
             size="icon" 
@@ -288,6 +290,7 @@ export default function WalletPage() {
             className="flex-shrink-0"
             onClick={() => copyToClipboard(number, "Minipay Number")}
             aria-label="Copy Minipay Number"
+            disabled={!number}
         >
             <Copy className="h-4 w-4" />
         </Button>
@@ -536,3 +539,4 @@ export default function WalletPage() {
     </div>
   );
 }
+
