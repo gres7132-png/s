@@ -278,7 +278,7 @@ export default function WalletPage() {
             <div className="flex items-center gap-2">
                 <LinkIcon className="h-4 w-4 text-muted-foreground" />
                 <Link href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline font-bold">
-                    {link}
+                    Open Invite Link
                 </Link>
             </div>
         )}
