@@ -376,7 +376,7 @@ export default function TransactionsPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Withdrawal Requests</CardTitle>
-                    <CardDescription>Approve to deduct funds and apply a 15% service fee. You must then manually send the final amount to the user's saved payment details.</CardDescription>
+                    <CardDescription>Approve to deduct funds and apply a 15% tax. You must then manually send the final amount to the user's saved payment details.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
