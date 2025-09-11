@@ -41,12 +41,25 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface TransactionProof {
   id: string;
   userId: string;
-  userName: string;
+  userName:string;
   proof: string;
   amount: number;
   submittedAt: Timestamp;
@@ -72,6 +85,8 @@ interface WithdrawalRequest {
   serviceFee?: number;
 }
 
+type TransactionItem = (TransactionProof | WithdrawalRequest) & { type: 'deposit' | 'withdrawal' };
+
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
@@ -82,11 +97,15 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  const [approvalItem, setApprovalItem] = useState<TransactionItem | null>(null);
+  const [approvalAmount, setApprovalAmount] = useState<number>(0);
+  
+
   const handleUpdateStatus = useCallback(async (
     type: 'deposit' | 'withdrawal',
     id: string,
     userId: string,
-    amount: number,
+    verifiedAmount: number, // Changed from 'amount'
     status: 'approved' | 'rejected'
   ) => {
     setUpdatingId(id);
@@ -100,10 +119,10 @@ export default function TransactionsPage() {
 
             // 1. Update the transaction status
             if (type === 'withdrawal' && status === 'approved') {
-                const serviceFee = amount * WITHDRAWAL_FEE_RATE;
-                transaction.update(transactionDocRef, { status, serviceFee });
+                const serviceFee = verifiedAmount * WITHDRAWAL_FEE_RATE;
+                transaction.update(transactionDocRef, { status, serviceFee, amount: verifiedAmount });
             } else {
-                transaction.update(transactionDocRef, { status });
+                 transaction.update(transactionDocRef, { status, amount: status === 'approved' ? verifiedAmount : undefined });
             }
 
             // 2. If approved, update the user's balance
@@ -112,8 +131,8 @@ export default function TransactionsPage() {
                 if (!userStatsDoc.exists() && type === 'deposit') {
                     // Create the stats doc if it doesn't exist on first deposit
                      transaction.set(userStatsDocRef, { 
-                        availableBalance: amount,
-                        rechargeAmount: amount,
+                        availableBalance: verifiedAmount,
+                        rechargeAmount: verifiedAmount,
                         withdrawalAmount: 0,
                         todaysEarnings: 0,
                      });
@@ -124,14 +143,14 @@ export default function TransactionsPage() {
                     let newWithdrawal = currentStats.withdrawalAmount || 0;
 
                     if (type === 'deposit') {
-                        newBalance += amount;
-                        newRecharge += amount;
+                        newBalance += verifiedAmount;
+                        newRecharge += verifiedAmount;
                     } else { // withdrawal
-                        if (newBalance < amount) {
+                        if (newBalance < verifiedAmount) {
                             throw new Error("User has insufficient funds for this withdrawal.");
                         }
-                        newBalance -= amount;
-                        newWithdrawal += amount;
+                        newBalance -= verifiedAmount;
+                        newWithdrawal += verifiedAmount;
                     }
                     
                     transaction.update(userStatsDocRef, { 
@@ -160,6 +179,8 @@ export default function TransactionsPage() {
         });
     } finally {
         setUpdatingId(null);
+        setApprovalItem(null);
+        setApprovalAmount(0);
     }
   }, [toast]);
 
@@ -225,22 +246,30 @@ export default function TransactionsPage() {
       item: TransactionProof | WithdrawalRequest
   ) => {
      if (item.status !== 'pending') return null;
+     
+     const transactionItem = { ...item, type };
+
      return (
         <div className="flex gap-2 justify-end">
-            <Button
-                size="sm"
-                variant="outline"
-                className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
-                onClick={() => handleUpdateStatus(type, item.id, item.userId, item.amount, 'approved')}
-                disabled={updatingId === item.id}
-            >
-                <CheckCircle className="h-4 w-4 mr-1" /> Approve
-            </Button>
+            <AlertDialogTrigger asChild>
+                 <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
+                    onClick={() => {
+                        setApprovalItem(transactionItem);
+                        setApprovalAmount(item.amount);
+                    }}
+                    disabled={updatingId === item.id}
+                >
+                    <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                </Button>
+            </AlertDialogTrigger>
             <Button
                 size="sm"
                 variant="outline"
                 className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={() => handleUpdateStatus(type, item.id, item.userId, item.amount, 'rejected')}
+                onClick={() => handleUpdateStatus(type, item.id, item.userId, 0, 'rejected')}
                 disabled={updatingId === item.id}
             >
                 <XCircle className="h-4 w-4 mr-1" /> Reject
@@ -274,6 +303,16 @@ export default function TransactionsPage() {
     );
   };
 
+  const handleApprovalDialogCancel = () => {
+    setApprovalItem(null);
+    setApprovalAmount(0);
+  };
+
+  const handleApprovalDialogConfirm = () => {
+    if (!approvalItem) return;
+    handleUpdateStatus(approvalItem.type, approvalItem.id, approvalItem.userId, approvalAmount, 'approved');
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -283,6 +322,7 @@ export default function TransactionsPage() {
         </p>
       </div>
 
+    <AlertDialog>
        <Tabs defaultValue="deposits">
         <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="deposits">
@@ -296,7 +336,7 @@ export default function TransactionsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Deposit Proofs</CardTitle>
-                    <CardDescription>Users submit these proofs after making a deposit. You must manually verify the payment in the corresponding payment system before approving. Approving will credit the user's account.</CardDescription>
+                    <CardDescription>Verify payments in the corresponding system, then approve with the correct amount to credit the user's account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -336,7 +376,7 @@ export default function TransactionsPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Withdrawal Requests</CardTitle>
-                    <CardDescription>Users request to withdraw funds. Approving will deduct the full requested amount from their balance and apply a 15% service fee to the transaction. You must then manually send the final amount (requested amount - 15% fee) to the user's saved payment details.</CardDescription>
+                    <CardDescription>Approve to deduct funds and apply a 15% service fee. You must then manually send the final amount to the user's saved payment details.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
@@ -373,8 +413,37 @@ export default function TransactionsPage() {
             </Card>
         </TabsContent>
       </Tabs>
+      
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Approval</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Verify the amount for this transaction. The user's account will be updated with the value you enter below.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="approval-amount" className="text-right">
+                        Amount (KES)
+                    </Label>
+                    <Input
+                        id="approval-amount"
+                        type="number"
+                        value={approvalAmount}
+                        onChange={(e) => setApprovalAmount(parseFloat(e.target.value) || 0)}
+                        className="col-span-3"
+                    />
+                </div>
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleApprovalDialogCancel}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleApprovalDialogConfirm}>
+                    {updatingId ? <Loader2 className="animate-spin" /> : "Confirm & Approve"}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+
+      </AlertDialog>
     </div>
   );
 }
-
-    
