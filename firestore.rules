@@ -1,78 +1,103 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated.
-    function isAuthenticated() {
+    // --- Admin Emails ---
+    // This is a secure way to define a list of admin users by their email address.
+    // Ensure these emails match those in your `use-auth.tsx` hook.
+    function getAdminEmails() {
+      return ["gres7132@gmail.com"];
+    }
+
+    // --- Helper Functions ---
+    // Checks if the requesting user is authenticated.
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    // Helper function to check if the user is requesting their own data.
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // Public collections: anyone can read these.
-    match /silverLevelPackages/{docId} {
-      allow read: if true;
-      allow write: if false; // Only admins should write via backend functions.
-    }
-    match /distributorTiers/{docId} {
-      allow read: if true;
-      allow write: if false; // Only admins should write via backend functions.
-    }
-    match /commissionTiers/{docId} {
-      allow read: if true;
-      allow write: if false; // Only admins should write via backend functions.
-    }
-
-    // Live transactions: Anyone can read these to populate the public feed.
-    match /transactionProofs/{docId} {
-        allow read: if true;
-        allow create: if isAuthenticated(); // A user can create their own deposit proof
-        allow update, delete: if false; // Only admins can update/delete
-    }
-    match /withdrawalRequests/{docId} {
-        allow read: if true;
-        allow create: if isAuthenticated(); // A user can create their own withdrawal request
-        allow update, delete: if false; // Only admins can update/delete
-    }
-
-    // User-specific data: Only the owner can access their own documents.
-    match /users/{userId} {
-      allow read: if isOwner(userId);
-      // Allow creation during sign-up.
-      allow create: if isAuthenticated();
-      // Allow profile updates.
-      allow update: if isOwner(userId);
-    }
-
-    match /userStats/{userId} {
-      allow read, write: if isOwner(userId);
-      // Allow creation during sign-up batch write.
-      allow create: if isAuthenticated();
-    }
-
-    match /userPaymentDetails/{userId} {
-      allow read, write: if isOwner(userId);
+    
+    // Checks if the requesting user's email is in the admin list.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email in getAdminEmails();
     }
     
+    // Checks if the user is the owner of the document.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // --- User Data Rules (users/{userId}) ---
+    match /users/{userId} {
+      // Admins can read any user's profile.
+      // Users can read/write their own profile.
+      allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
+
+      // --- Subcollections for a specific user ---
+      // Investments: Users can read their own, Admins can read any.
+      match /investments/{investmentId} {
+        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+        // Only backend/server-side logic should create/update investments.
+        allow write: if false; 
+      }
+
+      // Referrals: Users can read their own, Admins can read any.
+      match /referrals/{referralId} {
+        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+         // Only backend logic should create this record during signup.
+        allow write: if false;
+      }
+    }
+
+    // --- User Stats Rules (userStats/{userId}) ---
+    match /userStats/{userId} {
+      // Admins can read/write any user's stats (for approvals).
+      // Users can only read their own stats.
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow write: if isAdmin(); // Crucial for admins to approve transactions
+    }
+    
+    // --- User Payment Details Rules ---
+    match /userPaymentDetails/{userId} {
+        // Users can create and update their own payment details.
+        // Admins can read anyone's details to process withdrawals.
+        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+        allow write: if isSignedIn() && isOwner(userId);
+    }
+
+    // --- Public Data Rules (readable by any signed-in user) ---
+    match /silverLevelPackages/{packageId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin(); // Only Admins can create/delete packages
+    }
+    match /distributorTiers/{tierId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin(); // Only Admins can create/delete tiers
+    }
+     match /commissionTiers/{tierId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin(); // Only Admins can create/delete tiers
+    }
+
+    // --- Transaction Rules (Deposits and Withdrawals) ---
+    match /transactionProofs/{proofId} {
+      // Users can create their own deposit proofs.
+      // Admins can read all proofs and update their status (approve/reject).
+      allow create: if isSignedIn();
+      allow read, update: if isAdmin();
+    }
+
+    match /withdrawalRequests/{requestId} {
+      // Users can create their own withdrawal requests.
+      // Admins can read all requests and update their status.
+      allow create: if isSignedIn();
+      allow read, update: if isAdmin();
+    }
+    
+     // --- Earnings Log Rules (For server-side processing) ---
     match /earningsLog/{userId} {
-        allow read, write: if isOwner(userId);
-    }
-
-    match /users/{userId}/investments/{investmentId} {
-      allow read, create: if isOwner(userId);
-      allow update, delete: if false; // Prevent users from altering investments.
-    }
-
-    // Referral sub-collection:
-    // A user can read their own list of referrals.
-    // A new user can write their ID to their referrer's list during signup.
-    match /users/{referrerId}/referrals/{newUserId} {
-      allow read: if isOwner(referrerId);
-      allow create: if isAuthenticated() && request.auth.uid == newUserId;
+        // Only backend processes should access this. No client access.
+        allow read, write: if false;
     }
   }
 }
