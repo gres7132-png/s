@@ -277,7 +277,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                                             <TableCell><Badge variant={r.status === 'Active' ? 'default' : 'secondary'}>{r.status}</Badge></TableCell>
                                         </TableRow>
                                     )) : <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No referrals found.</TableCell></TableRow>}
-                                </Body>
+                                </TableBody>
                             </Table>
                         </TabsContent>
                          <TabsContent value="deposits">
@@ -317,5 +317,3 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     </div>
   );
 }
-
-    
