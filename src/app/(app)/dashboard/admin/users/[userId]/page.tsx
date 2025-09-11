@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, useCallback } from "react";
-import { Ban, CheckCircle, Info, Loader2, ShieldAlert } from "lucide-react";
+import { Ban, CheckCircle, Info, Loader2, ShieldAlert, Wallet } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -40,6 +40,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import { updateUserStatus, listAllUsers, UserData } from "@/ai/flows/user-management";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const profileSchema = z.object({
   displayName: z.string().min(1, "Full name is required.").optional(),
@@ -48,6 +50,14 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
+interface PaymentDetails {
+    paymentMethod: 'mobile' | 'crypto' | 'minipay';
+    mobileNumber?: string;
+    minipayNumber?: string;
+    cryptoCurrency?: 'BTC' | 'ETH' | 'USDT';
+    cryptoAddress?: string;
+}
+
 export default function UserDetailsPage({ params }: { params: { userId: string } }) {
   const { userId } = params;
   const { toast } = useToast();
@@ -55,6 +65,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
   const [referrals, setReferrals] = useState([]);
   const [transactions, setTransactions] = useState({ deposits: [], withdrawals: [] });
 
@@ -69,8 +80,6 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const fetchUserData = useCallback(async () => {
     setLoading(true);
     try {
-        // In a real app, you'd have a dedicated `getUser(uid)` flow.
-        // For this prototype, we'll fetch all users and find the one we need.
         const { users } = await listAllUsers();
         const currentUser = users.find(u => u.uid === userId);
         if (currentUser) {
@@ -79,8 +88,15 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                 displayName: currentUser.displayName || "",
                 email: currentUser.email || "",
             });
+            
+            // Fetch payment details
+            const paymentDetailsRef = doc(db, "userPaymentDetails", userId);
+            const paymentDetailsSnap = await getDoc(paymentDetailsRef);
+            if (paymentDetailsSnap.exists()) {
+                setPaymentDetails(paymentDetailsSnap.data() as PaymentDetails);
+            }
+
         } else {
-             // In the prototype, this will be the common case.
              console.log("User not found in simulated list. This is expected.");
         }
     } catch(e) {
@@ -94,12 +110,9 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   useEffect(() => {
     if (isAdmin && userId) {
       fetchUserData();
-      // Fetching referrals and transactions would also happen here
     }
   }, [userId, isAdmin, fetchUserData]);
 
-  // Profile form submission is disabled as updating displayName/email
-  // requires the Admin SDK, which we are simulating.
   async function onSubmit(values: ProfileFormValues) {
     toast({ title: "Note", description: "Updating user profile details from the admin panel requires the Firebase Admin SDK and is disabled in this prototype." });
   }
@@ -110,14 +123,13 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     const newStatus = !user.disabled;
     try {
         await updateUserStatus({ uid: user.uid, disabled: newStatus });
-        setUser(prev => prev ? {...prev, disabled: newStatus } : null); // Optimistic update
+        setUser(prev => prev ? {...prev, disabled: newStatus } : null);
         toast({
             title: `User ${newStatus ? 'Suspended' : 'Reactivated'}`,
             description: `${user.displayName || user.email} has been ${newStatus ? 'suspended' : 'reactivated'}.`
         });
     } catch (error) {
         toast({ variant: "destructive", title: "Action Failed" });
-        // Revert optimistic update on failure
         setUser(prev => prev ? {...prev, disabled: !newStatus } : null);
     } finally {
         setActionLoading(false);
@@ -150,6 +162,16 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         </div>
      );
   }
+
+  const renderPaymentDetail = (label: string, value?: string) => {
+    if (!value) return null;
+    return (
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono text-right break-all">{value}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -187,6 +209,29 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                 </CardFooter>
               </form>
             </Form>
+          </Card>
+          
+           <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-muted-foreground"/>
+                    <CardTitle>Payment Details</CardTitle>
+                </div>
+              <CardDescription>Withdrawal information saved by the user.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                {paymentDetails ? (
+                    <>
+                        {renderPaymentDetail("Method", paymentDetails.paymentMethod)}
+                        {renderPaymentDetail("Mobile Number", paymentDetails.mobileNumber)}
+                        {renderPaymentDetail("Minipay Number", paymentDetails.minipayNumber)}
+                        {renderPaymentDetail("Crypto Currency", paymentDetails.cryptoCurrency)}
+                        {renderPaymentDetail("Crypto Address", paymentDetails.cryptoAddress)}
+                    </>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No payment details saved.</p>
+                )}
+            </CardContent>
           </Card>
 
            <Card>
@@ -272,3 +317,5 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     </div>
   );
 }
+
+    
