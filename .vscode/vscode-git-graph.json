@@ -1,19 +1,4 @@
 {
-    "includeCommitsMentionedByReflogs": false,
-    "onlyFollowFirstParent": true,
-    "pullRequestConfig": {
-        "provider": "github",
-        "hostRootUrl": "https://github.com",
-        "sourceRemote": "origin",
-        "sourceOwner": "gres7132-png",
-        "sourceRepo": "s",
-        "destRemote": "origin",
-        "destOwner": "gres7132-png",
-        "destRepo": "s",
-        "destProjectId": "",
-        "destBranch": "main",
-        "custom": null
-    },
-    "showRemoteBranches": false,
-    "exportedAt": 1757549246636
+    "showRemoteBranches": true,
+    "exportedAt": 1757180480906
 }
