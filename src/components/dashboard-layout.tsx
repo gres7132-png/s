@@ -13,6 +13,9 @@ import {
   UserPlus,
   Gift,
   TrendingUp,
+  Shield,
+  LifeBuoy,
+  Globe,
 } from "lucide-react";
 
 import { signOut } from "firebase/auth";
@@ -31,6 +34,7 @@ import {
   useSidebar,
   SidebarGroup,
   SidebarFooter,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -57,11 +61,15 @@ const navItems = [
   { href: "/dashboard/commissions", icon: DollarSign, label: "Agent Commissions" },
 ];
 
+const adminNavItems = [
+    { href: "/dashboard/admin", icon: Shield, label: "Admin Panel" },
+];
+
 function NavMenu() {
   const pathname = usePathname();
   const { setOpenMobile, isMobile } = useSidebar();
   const router = useRouter();
-  const { auth } = useAuth();
+  const { auth, isAdmin } = useAuth();
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -92,10 +100,42 @@ function NavMenu() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         ))}
+        
+        {isAdmin && (
+            <>
+                <SidebarSeparator className="my-2" />
+                 {adminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={item.label}
+                      onClick={handleLinkClick}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+            </>
+        )}
       </SidebarMenu>
 
       <SidebarFooter className="mt-auto">
         <SidebarMenu>
+           <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip="Support"
+            >
+              <a href="https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ?mode=ems_wa_t" target="_blank" rel="noopener noreferrer">
+                <LifeBuoy />
+                <span>Support</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
              <SidebarMenuButton onClick={handleLogout} tooltip="Log Out">
                 <LogOut />
@@ -209,8 +249,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center justify-between lg:justify-end border-b px-4 lg:px-6">
+        <header className="flex h-14 items-center justify-between lg:justify-end gap-2 border-b px-4 lg:px-6">
           <SidebarTrigger className="lg:hidden h-12 w-12 [&>svg]:h-8 [&>svg]:w-8" />
+          <Button variant="outline" size="sm" asChild>
+              <Link href="/website">
+                <Globe />
+                <span>Go to Website</span>
+              </Link>
+          </Button>
           <UserProfileNav />
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">

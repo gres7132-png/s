@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -19,10 +19,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { Copy } from "lucide-react";
+import { Copy, Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, getDocs } from "firebase/firestore";
 
 // This interface defines the structure for a referred user object.
 interface ReferredUser {
@@ -37,23 +40,54 @@ export default function ReferralsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState("");
-  
-  // This state will hold the list of users referred by the current user.
-  // In a real application, you would fetch this data from your backend (e.g., Firestore).
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchReferredUsers = useCallback(async (userId: string) => {
+    setLoading(true);
+    const referralsColRef = collection(db, "users", userId, "referrals");
+    const referralsQuery = query(referralsColRef);
+
+    const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
+      const users: ReferredUser[] = [];
+      for (const doc of snapshot.docs) {
+        const referredUserId = doc.id;
+        const referredUserData = doc.data();
+
+        // Now, get the total investment for this referred user
+        const investmentsColRef = collection(db, "users", referredUserId, "investments");
+        const investmentsSnapshot = await getDocs(investmentsColRef);
+        
+        let totalInvested = 0;
+        investmentsSnapshot.forEach(investmentDoc => {
+          totalInvested += investmentDoc.data().price || 0;
+        });
+
+        const commission = totalInvested * 0.05; // 5% commission
+        const status: 'Active' | 'Pending' = totalInvested > 0 ? 'Active' : 'Pending';
+
+        users.push({
+          id: referredUserId,
+          name: referredUserData.displayName,
+          capital: totalInvested,
+          commission: commission,
+          status: status,
+        });
+      }
+      setReferredUsers(users);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
-      
-      // --- Backend Data Fetching Placeholder ---
-      // const fetchReferredUsers = async () => {
-      //   // Example: const users = await getReferredUsers(user.uid);
-      //   // setReferredUsers(users);
-      // };
-      // fetchReferredUsers();
+      const unsub = fetchReferredUsers(user.uid);
+      return () => { unsub.then(u => u()) };
     }
-  }, [user]);
+  }, [user, fetchReferredUsers]);
 
   const copyToClipboard = () => {
     if (!referralLink) return;
@@ -71,7 +105,7 @@ export default function ReferralsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Referral Program</h1>
         <p className="text-muted-foreground">
-          Earn a 5% commission for every new user you refer who invests.
+          Earn commissions from your network's investments.
         </p>
       </div>
 
@@ -93,18 +127,28 @@ export default function ReferralsPage() {
           </div>
         </CardContent>
       </Card>
+
+       <Alert>
+          <Users className="h-4 w-4" />
+          <AlertTitle>Commission Structure</AlertTitle>
+          <AlertDescription>
+            <p className="mt-2">
+                You earn a <strong>5%</strong> commission on the total amount invested by users you directly refer. The more your referrals invest, the more you earn.
+            </p>
+          </AlertDescription>
+        </Alert>
       
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Your Referrals</CardTitle>
+              <CardTitle>Your Direct Referrals</CardTitle>
               <CardDescription>
-                Track the status of your referred users and your commissions.
+                Track the status of users you've personally referred.
               </CardDescription>
             </div>
             <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Commission Earned</p>
+                <p className="text-sm text-muted-foreground">Commission Earned</p>
                 <p className="text-2xl font-bold">{formatCurrency(totalCommission)}</p>
             </div>
           </div>
@@ -120,7 +164,13 @@ export default function ReferralsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {referredUsers.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ) : referredUsers.length > 0 ? (
                 referredUsers.map((refUser) => (
                   <TableRow key={refUser.id}>
                     <TableCell className="font-medium">{refUser.name}</TableCell>
@@ -135,7 +185,7 @@ export default function ReferralsPage() {
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         You have not referred any users yet.
                     </TableCell>
                 </TableRow>

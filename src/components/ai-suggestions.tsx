@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { suggestInvestmentPackages } from "@/ai/flows/investment-package-suggestions";
 import { Loader2, Sparkles } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function AiSuggestions() {
+  const { user } = useAuth();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,17 +19,18 @@ export default function AiSuggestions() {
     setError(null);
     setSuggestions([]);
     
-    // In a real application, you would fetch the user's profile from your database.
-    const userProfile = `
-      - User has been a member for 6 months.
-      - Invested in the 'Starter' package twice.
-      - Current capital is $2,500.
-      - Expressed interest in moderate risk investments.
-      - Age: 34.
+    // --- Backend Data Fetching Placeholder ---
+    // In a real application, you would fetch the user's detailed profile 
+    // and investment history from your database to create this summary.
+    // const userProfileSummary = await getUserProfileForAI(user.uid);
+    const userProfileSummary = `
+      - User email: ${user?.email}
+      - Display name: ${user?.displayName}
+      - Investment history and goals need to be fetched from the database.
     `;
 
     try {
-      const result = await suggestInvestmentPackages({ userProfile });
+      const result = await suggestInvestmentPackages({ userProfile: userProfileSummary });
       if (result.suggestedPackages) {
         setSuggestions(result.suggestedPackages);
       }

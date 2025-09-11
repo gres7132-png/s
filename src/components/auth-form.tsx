@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +10,9 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
+
 
 import { Button } from "@/components/ui/button";
 import {
@@ -106,25 +109,47 @@ export function AuthForm() {
         values.email,
         values.password
       );
+      const newUser = userCredential.user;
 
-      if (userCredential.user) {
-        await updateProfile(userCredential.user, {
+      if (newUser) {
+        await updateProfile(newUser, {
           displayName: values.fullName,
         });
 
-        // This is where you would link the new user to their referrer.
+        // Use a batch to perform multiple writes atomically
+        const batch = writeBatch(db);
+
+        // 1. Create a document for the new user in the `users` collection
+        const userDocRef = doc(db, "users", newUser.uid);
+        const userData: { [key: string]: any } = {
+            displayName: values.fullName,
+            email: values.email,
+            createdAt: serverTimestamp(),
+            referredBy: values.referralCode || null,
+        };
+        batch.set(userDocRef, userData);
+
+        // 2. Create the initial stats document for the new user
+        const userStatsDocRef = doc(db, "userStats", newUser.uid);
+        batch.set(userStatsDocRef, {
+            availableBalance: 0,
+            todaysEarnings: 0,
+            rechargeAmount: 0,
+            withdrawalAmount: 0,
+        });
+
+        // 3. If the user was referred, add them to the referrer's `referrals` subcollection
         if (values.referralCode) {
-          console.log(`New user ${userCredential.user.uid} was referred by ${values.referralCode}`);
-          
-          // --- Backend Logic Placeholder ---
-          // In a real application with a database (like Firestore), you would:
-          // 1. Validate that `values.referralCode` is a valid user UID.
-          // 2. Create a document linking the new user to the referrer.
-          //    e.g., `referrals/{new_user_id}` -> { referrerId: 'referrer_uid' }
-          // 3. When the new user adds capital, a backend function would trigger
-          //    to calculate 5% and award it to the referrer.
-          // e.g., await awardReferralBonus(values.referralCode, newUserCapital);
+           const referrerDocRef = doc(db, "users", values.referralCode, "referrals", newUser.uid);
+           batch.set(referrerDocRef, {
+               displayName: values.fullName,
+               email: values.email,
+               joinedAt: serverTimestamp(),
+           });
         }
+        
+        // Commit all the writes in the batch
+        await batch.commit();
       }
       
       toast({
@@ -278,3 +303,4 @@ export function AuthForm() {
     </Tabs>
   );
 }
+

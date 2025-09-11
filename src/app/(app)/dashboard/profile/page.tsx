@@ -28,6 +28,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { updateProfile } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 const profileSchema = z.object({
   fullName: z.string().min(1, "Full name is required."),
@@ -39,7 +42,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const form = useForm<ProfileFormValues>({
@@ -53,39 +56,54 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      // --- Backend Data Fetching Placeholder ---
-      // In a real app, you might fetch more profile details from your database
-      // const userProfile = await getUserProfile(user.uid);
-      form.reset({
-        fullName: user.displayName || "",
-        email: user.email || "",
-        bio: "", // This would come from your database, e.g., userProfile.bio
-      });
+      const fetchProfile = async () => {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        const bio = userDoc.exists() ? userDoc.data().bio : "";
+
+        form.reset({
+          fullName: user.displayName || "",
+          email: user.email || "",
+          bio: bio || "",
+        });
+      };
+      
+      fetchProfile();
     }
   }, [user, form]);
 
   async function onSubmit(values: ProfileFormValues) {
+    if (!user) {
+      toast({ variant: "destructive", title: "Authentication Error", description: "You must be logged in to update your profile." });
+      return;
+    }
+
     setLoading(true);
     try {
-        // --- Backend Logic Placeholder ---
-        // Here you would call your backend to update the user's profile.
-        // This might update Firestore and Firebase Auth profile.
-        // Example: await updateUserProfile(user.uid, values);
-        console.log("Profile update:", values);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        toast({
-          title: "Profile Updated",
-          description: "Your profile has been successfully updated.",
-        });
+      // Update Firebase Auth display name if it has changed
+      if (values.fullName !== user.displayName) {
+        await updateProfile(user, { displayName: values.fullName });
+      }
+
+      // Update the user document in Firestore with the new bio
+      const userDocRef = doc(db, "users", user.uid);
+      await setDoc(userDocRef, { 
+        bio: values.bio,
+        displayName: values.fullName, // Also keep displayName in sync in Firestore
+      }, { merge: true });
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been successfully updated.",
+      });
     } catch (error) {
-         toast({
-          variant: "destructive",
-          title: "Update Failed",
-          description: "Could not update your profile. Please try again.",
-        });
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: "Could not update your profile. Please try again.",
+      });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   }
 
@@ -161,8 +179,8 @@ export default function ProfilePage() {
                 />
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={loading || authLoading}>
+                {(loading || authLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </CardFooter>

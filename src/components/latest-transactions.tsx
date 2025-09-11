@@ -12,22 +12,16 @@ import { formatCurrency } from "@/lib/utils";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-
-// In a real application, you would fetch this data from your backend.
-// This is mock data for demonstration purposes.
-const mockTransactions = [
-    { type: 'Deposit', user: 'User...4a2b', amount: 2800, time: '1 min ago' },
-    { type: 'Withdrawal', user: 'User...f8c1', amount: 39000, time: '3 mins ago' },
-    { type: 'Deposit', user: 'User...3e9d', amount: 1300, time: '5 mins ago' },
-    { type: 'Deposit', user: 'User...c5a7', amount: 9750, time: '8 mins ago' },
-    { type: 'Withdrawal', user: 'User...b1e6', amount: 65000, time: '12 mins ago' },
-];
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy, limit, Timestamp } from "firebase/firestore";
+import { formatDistanceToNow } from 'date-fns';
 
 interface Transaction {
+    id: string;
     type: 'Deposit' | 'Withdrawal';
-    user: string;
+    userName: string;
     amount: number;
-    time: string;
+    timestamp: Timestamp;
 }
 
 export default function LatestTransactions() {
@@ -35,13 +29,50 @@ export default function LatestTransactions() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate fetching data from a backend API
-    const timer = setTimeout(() => {
-      setTransactions(mockTransactions);
-      setLoading(false);
-    }, 1500); // Simulate a network delay
+    setLoading(true);
+    
+    const depositsQuery = query(collection(db, "transactionProofs"), orderBy("submittedAt", "desc"), limit(5));
+    const withdrawalsQuery = query(collection(db, "withdrawalRequests"), orderBy("requestedAt", "desc"), limit(5));
 
-    return () => clearTimeout(timer);
+    const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const newTx: Transaction = {
+                    id: `dep-${change.doc.id}`,
+                    type: 'Deposit',
+                    userName: data.userName,
+                    amount: data.amount || 0, // Assuming deposit amount is stored in proofs
+                    timestamp: data.submittedAt
+                };
+                 setTransactions(prev => [...prev, newTx].sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).slice(0, 5));
+            }
+        });
+        setLoading(false);
+    });
+
+    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => {
+       snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const newTx: Transaction = {
+                    id: `wd-${change.doc.id}`,
+                    type: 'Withdrawal',
+                    userName: data.userName,
+                    amount: data.amount,
+                    timestamp: data.requestedAt
+                };
+                setTransactions(prev => [...prev, newTx].sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).slice(0, 5));
+            }
+        });
+        setLoading(false);
+    });
+    
+    return () => {
+        unsubDeposits();
+        unsubWithdrawals();
+    };
+
   }, []);
 
   return (
@@ -64,8 +95,13 @@ export default function LatestTransactions() {
                  <Skeleton className="h-5 w-1/4" />
              </div>
           ))}
-          {!loading && transactions.map((tx, index) => (
-            <div key={index} className="flex items-center gap-4">
+          {!loading && transactions.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">
+              No recent transactions.
+            </p>
+          )}
+          {!loading && transactions.map((tx) => (
+            <div key={tx.id} className="flex items-center gap-4">
               <div>
                 {tx.type === 'Deposit' ? (
                   <ArrowUpCircle className="h-6 w-6 text-green-500" />
@@ -74,8 +110,8 @@ export default function LatestTransactions() {
                 )}
               </div>
               <div className="flex-grow">
-                <p className="font-medium">{tx.type} by {tx.user}</p>
-                <p className="text-sm text-muted-foreground">{tx.time}</p>
+                <p className="font-medium">{tx.type} by {tx.userName}</p>
+                <p className="text-sm text-muted-foreground">{tx.timestamp ? formatDistanceToNow(tx.timestamp.toDate(), { addSuffix: true }) : 'Just now'}</p>
               </div>
               <div className="font-bold text-right">
                 {formatCurrency(tx.amount)}

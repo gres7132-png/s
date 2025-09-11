@@ -18,13 +18,56 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Users } from "lucide-react";
-import { commissionTiers } from "@/lib/config";
+import { Users, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
-// In a real application, this would be determined by fetching data from the backend.
-const userActiveReferrals = 0; 
+interface CommissionTier {
+    id: string;
+    referrals: number;
+    commission: number;
+}
 
 export default function AgentCommissionsPage() {
+  const { user } = useAuth();
+  const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
+  const [loadingTiers, setLoadingTiers] = useState(true);
+  const [userActiveReferrals, setUserActiveReferrals] = useState(0);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const q = query(collection(db, "commissionTiers"), orderBy("referrals"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedTiers: CommissionTier[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedTiers.push({ id: doc.id, ...doc.data() } as CommissionTier);
+        });
+        setCommissionTiers(fetchedTiers);
+        setLoadingTiers(false);
+    }, (error) => {
+        console.error("Error fetching tiers:", error);
+        setLoadingTiers(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      // --- Backend Fetching Placeholder ---
+      const fetchReferralCount = async () => {
+        setLoading(true);
+        // const count = await getActiveReferralCount(user.uid);
+        // setUserActiveReferrals(count);
+        setUserActiveReferrals(0); // A new user starts with 0 referrals.
+        setLoading(false);
+      }
+      fetchReferralCount();
+    }
+  }, [user]);
+  
   const currentCommission = commissionTiers
     .slice()
     .reverse()
@@ -45,7 +88,7 @@ export default function AgentCommissionsPage() {
             <CardTitle>YOUR ACTIVE REFERRALS</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{userActiveReferrals}</p>
+            <p className="text-4xl font-bold">{loading ? "..." : userActiveReferrals}</p>
           </CardContent>
         </Card>
         <Card>
@@ -53,7 +96,7 @@ export default function AgentCommissionsPage() {
             <CardTitle>YOUR CURRENT MONTHLY COMMISSION</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold text-primary">{formatCurrency(currentCommission)}</p>
+            <p className="text-4xl font-bold text-primary">{loadingTiers ? "..." : formatCurrency(currentCommission)}</p>
           </CardContent>
         </Card>
       </div>
@@ -74,10 +117,12 @@ export default function AgentCommissionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {commissionTiers.map((tier) => (
-                <TableRow key={tier.referrals} className={userActiveReferrals >= tier.referrals ? "bg-secondary" : ""}>
+              {loadingTiers ? (
+                 <TableRow><TableCell colSpan={2} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
+              ) : commissionTiers.map((tier) => (
+                <TableRow key={tier.id} className={userActiveReferrals >= tier.referrals ? "bg-secondary" : ""}>
                   <TableCell className="font-medium">
-                    {tier.referrals}{tier.referrals === 2000 ? "+" : ""} Active Investors
+                    {tier.referrals}{commissionTiers[commissionTiers.length - 1].referrals === tier.referrals ? "+" : ""} Active Investors
                   </TableCell>
                   <TableCell className="text-right font-bold text-accent">{formatCurrency(tier.commission)}</TableCell>
                 </TableRow>
