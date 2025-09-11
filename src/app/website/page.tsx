@@ -93,7 +93,7 @@ export default function WebstitePage() {
                     YieldLink gives you direct access to the returns of large-scale crypto mining. We manage the hardware and operations, you enjoy the daily rewards.
                 </p>
                 <Button asChild size="lg" className="mt-8">
-                    <Link href="/auth">Get Started</Link>
+                    <Link href="/dashboard/invest">Invest Now</Link>
                 </Button>
             </div>
         </section>
@@ -213,7 +213,7 @@ export default function WebstitePage() {
                     Join YieldLink today and turn our mining power into your daily profit. Create your account in minutes and make your first investment.
                 </p>
                  <Button asChild size="lg" className="mt-8">
-                    <Link href="/auth">Create Your Account Now</Link>
+                    <Link href="/dashboard/invest">Invest Now</Link>
                 </Button>
             </div>
         </section>

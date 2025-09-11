@@ -28,8 +28,8 @@ export default function WebsiteLayout({
           <div className="flex flex-1 items-center justify-end space-x-2">
             <nav className="flex items-center">
               <Button asChild>
-                <Link href="/auth">
-                  Login / Sign Up
+                <Link href="/dashboard/invest">
+                  Invest Now
                 </Link>
               </Button>
             </nav>
