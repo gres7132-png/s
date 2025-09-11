@@ -1,15 +1,21 @@
 
 {
-    "cryptoFarm": {
-        "src": "https://picsum.photos/seed/miningrigs/600/400",
-        "width": 600,
-        "height": 400,
-        "hint": "mining rigs"
+    "heroMiner": {
+        "src": "https://picsum.photos/seed/herobackground/1920/1080",
+        "width": 1920,
+        "height": 1080,
+        "hint": "bitcoin miner"
     },
-    "serverRoom": {
-        "src": "https://picsum.photos/seed/serverroom/600/400",
+    "aboutMiners": {
+        "src": "https://picsum.photos/seed/aboutrigs/600/450",
         "width": 600,
-        "height": 400,
-        "hint": "server room"
+        "height": 450,
+        "hint": "bitcoin miner"
+    },
+    "whyChooseMiners": {
+        "src": "https://picsum.photos/seed/whyrigs/600/450",
+        "width": 600,
+        "height": 450,
+        "hint": "bitcoin miner"
     }
 }

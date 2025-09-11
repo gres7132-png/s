@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Cpu, DollarSign, ShieldCheck, Headphones, Zap } from "lucide-react";
+import { Cpu, DollarSign, ShieldCheck, Headphones, Zap, TrendingUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import placeholderImages from '@/lib/placeholder-images.json';
@@ -40,7 +40,7 @@ export default function WebstitePage() {
         description: "Your investments and data are protected with industry-leading security protocols and multi-layered protection."
     },
     {
-        icon: <DollarSign className="h-8 w-8 text-primary" />,
+        icon: <TrendingUp className="h-8 w-8 text-primary" />,
         title: "Transparent Earnings",
         description: "Track your daily earnings and watch your investment grow in real-time through your personal dashboard."
     },
@@ -73,12 +73,23 @@ export default function WebstitePage() {
   return (
     <div className="flex flex-col">
         {/* Hero Section */}
-        <section className="py-20 md:py-32 bg-secondary">
-            <div className="container mx-auto px-4 text-center">
-                <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-primary">
+        <section className="relative w-full h-[60vh] md:h-[80vh] flex items-center justify-center text-center text-white overflow-hidden">
+             <div className="absolute inset-0 z-0">
+                <Image
+                    src={placeholderImages.heroMiner.src}
+                    alt="Background of bitcoin miners"
+                    fill
+                    className="object-cover"
+                    data-ai-hint={placeholderImages.heroMiner.hint}
+                    priority
+                />
+                <div className="absolute inset-0 bg-black/60" />
+            </div>
+            <div className="container relative z-10 mx-auto px-4">
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white drop-shadow-lg">
                     Unlock the Power of Industrial Crypto Mining
                 </h1>
-                <p className="mt-4 max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground">
+                <p className="mt-4 max-w-2xl mx-auto text-lg md:text-xl text-primary-foreground/90 drop-shadow-md">
                     YieldLink gives you direct access to the returns of large-scale crypto mining. We manage the hardware and operations, you enjoy the daily rewards.
                 </p>
                 <Button asChild size="lg" className="mt-8">
@@ -88,7 +99,7 @@ export default function WebstitePage() {
         </section>
 
         {/* About Section */}
-        <section id="about" className="py-16 md:py-24">
+        <section id="about" className="py-16 md:py-24 bg-background">
             <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
                 <div className="space-y-4">
                     <h2 className="text-3xl font-bold tracking-tight">What is YieldLink?</h2>
@@ -101,19 +112,19 @@ export default function WebstitePage() {
                 </div>
                  <div>
                     <Image
-                        src={placeholderImages.cryptoFarm.src}
+                        src={placeholderImages.aboutMiners.src}
                         alt="A row of crypto mining rigs"
-                        width={placeholderImages.cryptoFarm.width}
-                        height={placeholderImages.cryptoFarm.height}
+                        width={placeholderImages.aboutMiners.width}
+                        height={placeholderImages.aboutMiners.height}
                         className="rounded-lg shadow-lg"
-                        data-ai-hint={placeholderImages.cryptoFarm.hint}
+                        data-ai-hint={placeholderImages.aboutMiners.hint}
                     />
                 </div>
             </div>
         </section>
 
         {/* How It Works Section */}
-         <section id="features" className="py-16 md:py-24 bg-secondary">
+         <section id="features" className="py-16 md:py-24 bg-secondary/50">
             <div className="container mx-auto px-4">
                  <div className="text-center space-y-4 mb-12">
                      <h2 className="text-3xl font-bold tracking-tight">How You Profit From Our Power</h2>
@@ -123,7 +134,7 @@ export default function WebstitePage() {
                  </div>
                  <div className="grid md:grid-cols-3 gap-8">
                     {howItWorksSteps.map((feature) => (
-                        <Card key={feature.title} className="text-center">
+                        <Card key={feature.title} className="text-center shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                             <CardHeader>
                                 <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit">
                                     {feature.icon}
@@ -140,16 +151,16 @@ export default function WebstitePage() {
         </section>
 
          {/* Why Choose Us Section */}
-        <section className="py-16 md:py-24">
+        <section className="py-16 md:py-24 bg-background">
             <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-                 <div>
+                 <div className="order-last md:order-first">
                     <Image
-                        src={placeholderImages.serverRoom.src}
-                        alt="Secure server room"
-                        width={placeholderImages.serverRoom.width}
-                        height={placeholderImages.serverRoom.height}
+                        src={placeholderImages.whyChooseMiners.src}
+                        alt="Secure bitcoin mining hardware"
+                        width={placeholderImages.whyChooseMiners.width}
+                        height={placeholderImages.whyChooseMiners.height}
                         className="rounded-lg shadow-lg"
-                        data-ai-hint={placeholderImages.serverRoom.hint}
+                        data-ai-hint={placeholderImages.whyChooseMiners.hint}
                     />
                 </div>
                 <div className="space-y-8">
@@ -157,7 +168,7 @@ export default function WebstitePage() {
                         <h2 className="text-3xl font-bold tracking-tight">Why Choose YieldLink?</h2>
                         <p className="text-muted-foreground">We are committed to providing a secure, transparent, and profitable platform for all our investors.</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-6">
                         {whyChooseUsFeatures.map((feature) => (
                             <div key={feature.title} className="flex items-start gap-4">
                                 {feature.icon}
@@ -173,7 +184,7 @@ export default function WebstitePage() {
         </section>
 
         {/* FAQ Section */}
-        <section id="faq" className="py-16 md:py-24 bg-secondary">
+        <section id="faq" className="py-16 md:py-24 bg-secondary/50">
              <div className="container mx-auto px-4 max-w-3xl">
                 <div className="text-center space-y-4 mb-12">
                      <h2 className="text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
@@ -195,7 +206,7 @@ export default function WebstitePage() {
         </section>
         
         {/* Call to Action Section */}
-        <section className="py-20 md:py-32">
+        <section className="py-20 md:py-32 bg-background">
             <div className="container mx-auto px-4 text-center">
                  <h2 className="text-3xl font-bold tracking-tight">Ready to Start Earning?</h2>
                  <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground">
