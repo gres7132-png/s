@@ -23,7 +23,6 @@ import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import AiSuggestions from "@/components/ai-suggestions";
 
 interface UserStats {
   availableBalance: number;
@@ -68,8 +67,6 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">Control Panel</h1>
       </div>
       
-      <AiSuggestions />
-
       <div className="grid gap-6 md:grid-cols-2">
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <Card>
