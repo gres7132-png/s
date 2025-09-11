@@ -9,18 +9,19 @@
 // All monetary values are in KES.
 
 // --- Payment Details ---
-// These details are now securely stored as environment variables and fetched on the server side.
-// See src/app/(app)/dashboard/wallet/page.tsx to see how they are used.
+// WARNING: Hardcoding sensitive data like payment details on the client-side is a security risk.
+// These values are publicly accessible in the browser. It is strongly recommended to
+// manage these via server-side environment variables.
 export const paymentDetails = {
-    mobileMoney: process.env.PAYMENT_MOBILE_MONEY,
+    mobileMoney: "0712345678", // Replace with your actual mobile money number
     minipay: {
-        link: process.env.PAYMENT_MINIPAY_LINK,
-        number: process.env.PAYMENT_MINIPAY_NUMBER,
+        link: "https://minipay.com/...", // Replace with your actual minipay link
+        number: "0712345678", // Replace with your actual minipay number
     },
     crypto: {
-        BTC: process.env.PAYMENT_CRYPTO_BTC,
-        ETH: process.env.PAYMENT_CRYPTO_ETH,
-        USDT: process.env.PAYMENT_CRYPTO_USDT,
+        BTC: "YOUR_BITCOIN_ADDRESS_HERE",
+        ETH: "YOUR_ETHEREUM_ADDRESS_HERE",
+        USDT: "YOUR_USDT_ADDRESS_HERE",
     },
 };
 
@@ -36,4 +37,3 @@ export const distributorTiers = [];
 // --- Agent Commission Tiers ---
 // This data is now managed in Firestore. See src/app/(app)/dashboard/admin/commissions/page.tsx
 export const commissionTiers = [];
-
