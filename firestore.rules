@@ -90,5 +90,10 @@ service cloud.firestore {
         allow create: if isAuthenticated();
         allow update: if isAdmin(); // Allows admin to change status to 'approved'/'rejected'
     }
+    
+    // Allow earnings log writes from backend functions
+    match /earningsLog/{logId} {
+        allow read, write: if false; // Should only be accessed by trusted backend
+    }
   }
 }
