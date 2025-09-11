@@ -1,103 +1,94 @@
 
 rules_version = '2';
 
+// --- Admin Configuration ---
+// This list MUST be kept in sync with the ADMIN_EMAILS array in src/hooks/use-auth.tsx
+function getAdminEmails() {
+  return ["gres7132@gmail.com"];
+}
+
+// --- Helper Functions ---
+function isAuthenticated() {
+  return request.auth != null;
+}
+
+function isOwner(userId) {
+  return request.auth.uid == userId;
+}
+
+// Checks if the requesting user's email is in the admin list.
+function isAdmin() {
+  return isAuthenticated() && request.auth.token.email in getAdminEmails();
+}
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Admin Emails ---
-    // This is a secure way to define a list of admin users by their email address.
-    // Ensure these emails match those in your `use-auth.tsx` hook.
-    function getAdminEmails() {
-      return ["gres7132@gmail.com"];
-    }
-
-    // --- Helper Functions ---
-    // Checks if the requesting user is authenticated.
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    // Checks if the requesting user's email is in the admin list.
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.email in getAdminEmails();
-    }
-    
-    // Checks if the user is the owner of the document.
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // --- User Data Rules (users/{userId}) ---
+  
+    // --- User Data ---
+    // Users can read/write their own document. Admins can read any user document.
     match /users/{userId} {
-      // Admins can read any user's profile.
-      // Users can read/write their own profile.
-      allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
-
-      // --- Subcollections for a specific user ---
-      // Investments: Users can read their own, Admins can read any.
-      match /investments/{investmentId} {
-        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-        // Only backend/server-side logic should create/update investments.
-        allow write: if false; 
-      }
-
-      // Referrals: Users can read their own, Admins can read any.
-      match /referrals/{referralId} {
-        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-         // Only backend logic should create this record during signup.
-        allow write: if false;
-      }
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
     }
-
-    // --- User Stats Rules (userStats/{userId}) ---
+    
+    // --- User-Specific Subcollections ---
+    match /users/{userId}/{collectionId}/{docId} {
+       // Users can manage their own subcollections (investments, referrals).
+       // Admins can read these subcollections for verification.
+       allow read, write: if isOwner(userId);
+       allow read: if isAdmin();
+    }
+    
+    // --- User Stats ---
+    // Users can read their own stats.
+    // Admins can read any user's stats and, crucially, can WRITE to them to update balances.
+    // The backend function (which runs as admin) also needs write access.
     match /userStats/{userId} {
-      // Admins can read/write any user's stats (for approvals).
-      // Users can only read their own stats.
-      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow write: if isAdmin(); // Crucial for admins to approve transactions
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin(); // Admin can update balances.
     }
     
-    // --- User Payment Details Rules ---
+    // --- User Payment Details ---
+    // Only the user can create, read, and update their own sensitive payment details.
+    // Not even admins can read this directly from the client for security.
     match /userPaymentDetails/{userId} {
-        // Users can create and update their own payment details.
-        // Admins can read anyone's details to process withdrawals.
-        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-        allow write: if isSignedIn() && isOwner(userId);
+       allow read, write: if isOwner(userId);
     }
 
-    // --- Public Data Rules (readable by any signed-in user) ---
+    // --- Investment Packages (Publicly readable, Admin writable) ---
     match /silverLevelPackages/{packageId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin(); // Only Admins can create/delete packages
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
+
+    // --- Distributor Tiers (Publicly readable, Admin writable) ---
     match /distributorTiers/{tierId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin(); // Only Admins can create/delete tiers
-    }
-     match /commissionTiers/{tierId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin(); // Only Admins can create/delete tiers
-    }
-
-    // --- Transaction Rules (Deposits and Withdrawals) ---
-    match /transactionProofs/{proofId} {
-      // Users can create their own deposit proofs.
-      // Admins can read all proofs and update their status (approve/reject).
-      allow create: if isSignedIn();
-      allow read, update: if isAdmin();
-    }
-
-    match /withdrawalRequests/{requestId} {
-      // Users can create their own withdrawal requests.
-      // Admins can read all requests and update their status.
-      allow create: if isSignedIn();
-      allow read, update: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
-     // --- Earnings Log Rules (For server-side processing) ---
-    match /earningsLog/{userId} {
-        // Only backend processes should access this. No client access.
-        allow read, write: if false;
+    // --- Commission Tiers (Publicly readable, Admin writable) ---
+    match /commissionTiers/{tierId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+    }
+
+    // --- Transaction Proofs (Deposits) ---
+    // Users can create their own deposit proofs.
+    // Admins can read all proofs and, crucially, can WRITE (update) the status.
+    match /transactionProofs/{proofId} {
+        allow read: if isAdmin();
+        allow create: if isAuthenticated();
+        allow update: if isAdmin(); // Allows admin to change status to 'approved'/'rejected'
+    }
+    
+    // --- Withdrawal Requests ---
+    // Users can create their own withdrawal requests.
+    // Admins can read all requests and, crucially, can WRITE (update) the status.
+    match /withdrawalRequests/{reqId} {
+        allow read: if isAdmin();
+        allow create: if isAuthenticated();
+        allow update: if isAdmin(); // Allows admin to change status to 'approved'/'rejected'
     }
   }
 }
