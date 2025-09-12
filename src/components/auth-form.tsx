@@ -11,7 +11,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, writeBatch, serverTimestamp, setDoc } from "firebase/firestore";
 
 
 import { Button } from "@/components/ui/button";
@@ -111,54 +111,50 @@ export function AuthForm() {
       );
       const newUser = userCredential.user;
 
-      if (newUser) {
-        await updateProfile(newUser, {
-          displayName: values.fullName,
-        });
+      // After user is created in Auth, update their profile and Firestore docs
+      await updateProfile(newUser, {
+        displayName: values.fullName,
+      });
 
-        // Use a batch to perform multiple writes atomically
-        const batch = writeBatch(db);
+      const batch = writeBatch(db);
 
-        // 1. Create a document for the new user in the `users` collection
-        const userDocRef = doc(db, "users", newUser.uid);
-        const userData: { [key: string]: any } = {
+      // 1. Set the user document
+      const userDocRef = doc(db, "users", newUser.uid);
+      batch.set(userDocRef, {
+        displayName: values.fullName,
+        email: values.email,
+        createdAt: serverTimestamp(),
+        referredBy: values.referralCode || null,
+      });
+
+      // 2. Set the user stats document
+      const userStatsDocRef = doc(db, "userStats", newUser.uid);
+      batch.set(userStatsDocRef, {
+        availableBalance: 0,
+        todaysEarnings: 0,
+        rechargeAmount: 0,
+        withdrawalAmount: 0,
+      });
+      
+      // 3. If there's a referral code, set that in a subcollection
+      if (values.referralCode) {
+        const referrerRef = doc(db, 'users', values.referralCode, 'referrals', newUser.uid);
+        batch.set(referrerRef, {
             displayName: values.fullName,
             email: values.email,
-            createdAt: serverTimestamp(),
-            referredBy: values.referralCode || null,
-        };
-        batch.set(userDocRef, userData);
-
-        // 2. Create the initial stats document for the new user
-        const userStatsDocRef = doc(db, "userStats", newUser.uid);
-        batch.set(userStatsDocRef, {
-            availableBalance: 0,
-            todaysEarnings: 0,
-            rechargeAmount: 0,
-            withdrawalAmount: 0,
+            joinedAt: serverTimestamp(),
         });
-
-        // 3. If the user was referred, add them to the referrer's `referrals` subcollection
-        if (values.referralCode) {
-           const referrerDocRef = doc(db, "users", values.referralCode, "referrals", newUser.uid);
-           batch.set(referrerDocRef, {
-               displayName: values.fullName,
-               email: values.email,
-               joinedAt: serverTimestamp(),
-           });
-        }
-        
-        // Commit all the writes in the batch
-        await batch.commit();
       }
-      
+
+      await batch.commit();
+
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
       });
       router.push("/dashboard");
-    } catch (error: any)
-{
+
+    } catch (error: any) {
       console.error("Sign up error:", error);
       toast({
         variant: "destructive",
@@ -303,4 +299,3 @@ export function AuthForm() {
     </Tabs>
   );
 }
-
