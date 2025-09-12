@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, useCallback } from "react";
-import { Ban, CheckCircle, Info, Loader2, ShieldAlert, Wallet } from "lucide-react";
+import { Ban, CheckCircle, Info, Loader2, Pencil, ShieldAlert, Trash2, Wallet } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -48,8 +48,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import { updateUserStatus, listAllUsers, UserData } from "@/ai/flows/user-management";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { updateBalance, updateInvestment, deleteInvestment } from "@/ai/flows/admin-actions";
 
 
 const bankingDetailsSchema = z.object({
@@ -70,35 +90,40 @@ const bankingDetailsSchema = z.object({
 
 type BankingDetailsFormValues = z.infer<typeof bankingDetailsSchema>;
 
+const balanceSchema = z.object({
+  availableBalance: z.coerce.number().min(0, "Balance cannot be negative."),
+});
+
+type BalanceFormValues = z.infer<typeof balanceSchema>;
+
+const investmentSchema = z.object({
+  price: z.coerce.number().positive(),
+  dailyReturn: z.coerce.number().positive(),
+  status: z.enum(["active", "completed"]),
+});
+type InvestmentFormValues = z.infer<typeof investmentSchema>;
+
+interface Investment extends InvestmentFormValues {
+    id: string;
+    name: string;
+    startDate: Timestamp;
+    duration: number;
+}
+
+
 export default function UserDetailsPage({ params }: { params: { userId: string } }) {
   const { userId } = params;
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
-  const [referrals, setReferrals] = useState([]);
-  const [transactions, setTransactions] = useState({ deposits: [], withdrawals: [] });
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
 
-  const profileForm = useForm<{displayName: string, email: string}>({
-    defaultValues: {
-      displayName: "",
-      email: "",
-    },
-  });
+  const balanceForm = useForm<BalanceFormValues>();
+  const investmentForm = useForm<InvestmentFormValues>({ resolver: zodResolver(investmentSchema) });
 
-  const paymentForm = useForm<BankingDetailsFormValues>({
-    resolver: zodResolver(bankingDetailsSchema),
-     defaultValues: {
-      paymentMethod: "mobile",
-      mobileNumber: "",
-      minipayNumber: "",
-      cryptoCurrency: undefined,
-      cryptoAddress: "",
-    },
-  });
-  
   const fetchUserData = useCallback(async () => {
     setLoading(true);
     try {
@@ -106,17 +131,6 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         const currentUser = users.find(u => u.uid === userId);
         if (currentUser) {
             setUser(currentUser);
-            profileForm.reset({
-                displayName: currentUser.displayName || "",
-                email: currentUser.email || "",
-            });
-            
-            const paymentDetailsRef = doc(db, "userPaymentDetails", userId);
-            const paymentDetailsSnap = await getDoc(paymentDetailsRef);
-            if (paymentDetailsSnap.exists()) {
-                paymentForm.reset(paymentDetailsSnap.data() as BankingDetailsFormValues);
-            }
-
         } else {
              toast({ variant: "destructive", title: "User Not Found" });
         }
@@ -125,29 +139,45 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     } finally {
         setLoading(false);
     }
-  }, [userId, profileForm, paymentForm, toast]);
-
+  }, [userId, toast]);
 
   useEffect(() => {
-    if (isAdmin && userId) {
-      fetchUserData();
-    }
-  }, [userId, isAdmin, fetchUserData]);
+    if (!isAdmin || !userId) return;
 
-  async function onPaymentDetailsSubmit(values: BankingDetailsFormValues) {
-    setIsSavingDetails(true);
-    try {
-        const detailsDocRef = doc(db, "userPaymentDetails", userId);
-        await setDoc(detailsDocRef, values, { merge: true });
-        toast({
-            title: "Payment Details Updated",
-            description: `Successfully updated payment information for ${user?.displayName}.`,
+    fetchUserData();
+
+    const userStatsRef = doc(db, "userStats", userId);
+    const unsubStats = onSnapshot(userStatsRef, (doc) => {
+        if (doc.exists()) {
+            balanceForm.reset({ availableBalance: doc.data().availableBalance || 0 });
+        }
+    });
+
+    const investmentsQuery = query(collection(db, `users/${userId}/investments`), orderBy("startDate", "desc"));
+    const unsubInvestments = onSnapshot(investmentsQuery, (snapshot) => {
+        const fetchedInvestments: Investment[] = [];
+        snapshot.forEach(doc => {
+            fetchedInvestments.push({ id: doc.id, ...doc.data() } as Investment);
         });
-    } catch (error) {
-         console.error("Error saving payment details:", error);
-         toast({ variant: "destructive", title: "Save Failed", description: "Could not save payment details."});
+        setInvestments(fetchedInvestments);
+    });
+
+    return () => {
+        unsubStats();
+        unsubInvestments();
+    };
+  }, [userId, isAdmin, fetchUserData, balanceForm]);
+
+
+  async function onBalanceSubmit(values: BalanceFormValues) {
+    setActionLoading(true);
+    try {
+      await updateBalance({ userId, newBalance: values.availableBalance });
+      toast({ title: "Balance Updated", description: "The user's balance has been successfully changed."});
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update Failed", description: e.message });
     } finally {
-        setIsSavingDetails(false);
+      setActionLoading(false);
     }
   }
 
@@ -169,6 +199,46 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         setActionLoading(false);
     }
   };
+
+  const handleEditInvestment = (investment: Investment) => {
+    setEditingInvestment(investment);
+    investmentForm.reset({
+      price: investment.price,
+      dailyReturn: investment.dailyReturn,
+      status: investment.status,
+    });
+  };
+
+  const handleUpdateInvestment = async (values: InvestmentFormValues) => {
+    if (!editingInvestment) return;
+    setActionLoading(true);
+    try {
+      await updateInvestment({
+        userId,
+        investmentId: editingInvestment.id,
+        ...values,
+      });
+      toast({ title: "Investment Updated" });
+      setEditingInvestment(null);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update Failed", description: e.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleDeleteInvestment = async (investmentId: string) => {
+     setActionLoading(true);
+    try {
+        await deleteInvestment({ userId, investmentId });
+        toast({ title: "Investment Deleted" });
+    } catch (e: any) {
+        toast({ variant: "destructive", title: "Deletion Failed", description: e.message });
+    } finally {
+        setActionLoading(false);
+    }
+  };
+
 
   if (authLoading || loading) {
     return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -197,8 +267,6 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
      );
   }
 
-  const selectedPaymentMethod = paymentForm.watch("paymentMethod");
-
   return (
     <div className="space-y-8">
       <div>
@@ -211,141 +279,54 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-8">
           <Card>
-            <Form {...profileForm}>
-              <form>
-                <CardHeader>
-                  <CardTitle>User Profile</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
-                      <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <FormField control={profileForm.control} name="displayName" render={({ field }) => (
-                      <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl></FormItem>
-                  )}/>
-                  <FormField control={profileForm.control} name="email" render={({ field }) => (
-                      <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted"/></FormControl></FormItem>
-                  )}/>
-                </CardContent>
-              </form>
-            </Form>
+            <CardHeader>
+                <CardTitle>User Profile</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="flex items-center space-x-4">
+                <Avatar className="h-16 w-16">
+                    <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
+                    <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
+                </Avatar>
+                 <div className="space-y-1">
+                    <p className="font-semibold">{user.displayName}</p>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <Badge variant={user.disabled ? 'destructive' : 'default'}>
+                        {user.disabled ? 'Suspended' : 'Active'}
+                    </Badge>
+                 </div>
+                </div>
+            </CardContent>
           </Card>
           
            <Card>
-            <Form {...paymentForm}>
-              <form onSubmit={paymentForm.handleSubmit(onPaymentDetailsSubmit)}>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Wallet className="h-5 w-5 text-muted-foreground"/>
-                        <CardTitle>Payment Details</CardTitle>
-                    </div>
-                  <CardDescription>Withdrawal information saved by the user.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <FormField
-                        control={paymentForm.control}
-                        name="paymentMethod"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Payment Method</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger disabled={isSavingDetails}>
-                                  <SelectValue placeholder="Select a payment method" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="minipay">Minipay</SelectItem>
-                                <SelectItem value="mobile">Mobile Money</SelectItem>
-                                <SelectItem value="crypto">Crypto Wallet</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      {selectedPaymentMethod === "mobile" && (
-                        <FormField
-                          control={paymentForm.control}
-                          name="mobileNumber"
+             <Form {...balanceForm}>
+                <form onSubmit={balanceForm.handleSubmit(onBalanceSubmit)}>
+                  <CardHeader>
+                      <CardTitle>Account Stats</CardTitle>
+                      <CardDescription>Directly modify the user's available balance.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                       <FormField
+                          control={balanceForm.control}
+                          name="availableBalance"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Phone Number</FormLabel>
+                              <FormLabel>Available Balance (KES)</FormLabel>
                               <FormControl>
-                                <Input placeholder="e.g. 0712345678" {...field} disabled={isSavingDetails} />
+                                <Input type="number" {...field} disabled={actionLoading} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      )}
-
-                      {selectedPaymentMethod === "minipay" && (
-                        <FormField
-                          control={paymentForm.control}
-                          name="minipayNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Minipay Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g. 0781309701" {...field} disabled={isSavingDetails} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-
-                      {selectedPaymentMethod === "crypto" && (
-                        <div className="space-y-4">
-                          <FormField
-                            control={paymentForm.control}
-                            name="cryptoCurrency"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Cryptocurrency</FormLabel>
-                                 <Select onValueChange={field.onChange} value={field.value} disabled={isSavingDetails}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a currency" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
-                                    <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
-                                    <SelectItem value="USDT">Tether (USDT)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                           <FormField
-                            control={paymentForm.control}
-                            name="cryptoAddress"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Wallet Address</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Enter wallet address" {...field} disabled={isSavingDetails} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      )}
-                </CardContent>
-                <CardFooter>
-                    <Button type="submit" className="w-full" disabled={isSavingDetails}>
-                        {isSavingDetails ? <Loader2 className="animate-spin" /> : "Save Payment Details"}
-                    </Button>
-                </CardFooter>
-              </form>
+                  </CardContent>
+                  <CardFooter>
+                      <Button type="submit" className="w-full" disabled={actionLoading}>
+                          {actionLoading ? <Loader2 className="animate-spin" /> : "Save Balance"}
+                      </Button>
+                  </CardFooter>
+                </form>
             </Form>
           </Card>
 
@@ -372,54 +353,47 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
             <Card>
                 <CardHeader>
                     <CardTitle>User Activity</CardTitle>
-                    <CardDescription>Referrals and transactions for this user.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                     <Tabs defaultValue="referrals">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="referrals">Referrals</TabsTrigger>
-                            <TabsTrigger value="deposits">Deposits</TabsTrigger>
-                            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+                     <Tabs defaultValue="investments">
+                        <TabsList className="grid w-full grid-cols-1">
+                            <TabsTrigger value="investments">Investments</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="referrals">
+                        <TabsContent value="investments">
                             <Table>
-                                <TableHeader><TableRow><TableHead>User Name</TableHead><TableHead>Invested</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Price</TableHead>
+                                    <TableHead>Daily Return</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
                                 <TableBody>
-                                    {referrals.length > 0 ? referrals.map((r: any) => (
-                                        <TableRow key={r.id}>
-                                            <TableCell>{r.name}</TableCell>
-                                            <TableCell>{formatCurrency(r.capital)}</TableCell>
-                                            <TableCell><Badge variant={r.status === 'Active' ? 'default' : 'secondary'}>{r.status}</Badge></TableCell>
+                                    {investments.length > 0 ? investments.map((inv) => (
+                                        <TableRow key={inv.id}>
+                                            <TableCell className="font-medium">{inv.name}</TableCell>
+                                            <TableCell>{formatCurrency(inv.price)}</TableCell>
+                                            <TableCell>{formatCurrency(inv.dailyReturn)}</TableCell>
+                                            <TableCell><Badge variant={inv.status === 'active' ? 'default' : 'secondary'}>{inv.status}</Badge></TableCell>
+                                            <TableCell className="text-right space-x-1">
+                                                <Button variant="ghost" size="icon" onClick={() => handleEditInvestment(inv)}><Pencil className="h-4 w-4" /></Button>
+                                                 <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the investment: <strong>{inv.name}</strong>. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteInvestment(inv.id)} className="bg-destructive hover:bg-destructive/80">Delete</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </TableCell>
                                         </TableRow>
-                                    )) : <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No referrals found.</TableCell></TableRow>}
-                                </TableBody>
-                            </Table>
-                        </TabsContent>
-                         <TabsContent value="deposits">
-                             <Table>
-                                <TableHeader><TableRow><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                                <TableBody>
-                                    {transactions.deposits.length > 0 ? transactions.deposits.map((t: any) => (
-                                        <TableRow key={t.id}>
-                                            <TableCell>{formatCurrency(t.amount)}</TableCell>
-                                            <TableCell>{t.date.toLocaleDateString()}</TableCell>
-                                            <TableCell><Badge>{t.status}</Badge></TableCell>
-                                        </TableRow>
-                                    )) : <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No deposits found.</TableCell></TableRow>}
-                                </TableBody>
-                            </Table>
-                        </TabsContent>
-                         <TabsContent value="withdrawals">
-                             <Table>
-                                <TableHeader><TableRow><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                                <TableBody>
-                                     {transactions.withdrawals.length > 0 ? transactions.withdrawals.map((t: any) => (
-                                        <TableRow key={t.id}>
-                                            <TableCell>{formatCurrency(t.amount)}</TableCell>
-                                            <TableCell>{t.date.toLocaleDateString()}</TableCell>
-                                            <TableCell><Badge variant="secondary">{t.status}</Badge></TableCell>
-                                        </TableRow>
-                                    )): <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No withdrawals found.</TableCell></TableRow>}
+                                    )) : <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No investments found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </TabsContent>
@@ -429,9 +403,45 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         </div>
 
       </div>
+
+      <Dialog open={!!editingInvestment} onOpenChange={(open) => !open && setEditingInvestment(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Investment</DialogTitle>
+                <DialogDescription>Modify the details for "{editingInvestment?.name}".</DialogDescription>
+            </DialogHeader>
+            <Form {...investmentForm}>
+                <form onSubmit={investmentForm.handleSubmit(handleUpdateInvestment)} className="space-y-4">
+                    <FormField control={investmentForm.control} name="price" render={({ field }) => (
+                        <FormItem><FormLabel>Price (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                     <FormField control={investmentForm.control} name="dailyReturn" render={({ field }) => (
+                        <FormItem><FormLabel>Daily Return (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                     <FormField control={investmentForm.control} name="status" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => setEditingInvestment(null)}>Cancel</Button>
+                        <Button type="submit" disabled={actionLoading}>
+                            {actionLoading ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
-
-
-    

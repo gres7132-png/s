@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import {
@@ -16,7 +17,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy, getDoc } from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy, getDoc, writeBatch } from "firebase/firestore";
 
 interface InvestmentPackage {
   id: string;
@@ -88,21 +89,21 @@ export default function InvestPage() {
     try {
       await runTransaction(db, async (transaction) => {
         const userStatsDocRef = doc(db, "userStats", user.uid);
-        const earningsLogDocRef = doc(db, "earningsLog", user.uid);
         
         const userStatsDoc = await transaction.get(userStatsDocRef);
-        const earningsLogDoc = await transaction.get(earningsLogDocRef);
 
         const currentBalance = userStatsDoc.exists() ? userStatsDoc.data().availableBalance : 0;
         if (currentBalance < pkg.price) {
           throw new Error("Insufficient funds.");
         }
 
+        // 1. Deduct price from balance
         const newBalance = currentBalance - pkg.price;
-        transaction.set(userStatsDocRef, { availableBalance: newBalance }, { merge: true });
+        transaction.update(userStatsDocRef, { availableBalance: newBalance });
 
-        const investmentDocRef = collection(db, "users", user.uid, "investments");
-        transaction.set(doc(investmentDocRef), {
+        // 2. Create the new investment document
+        const investmentDocRef = doc(collection(db, "users", user.uid, "investments"));
+        transaction.set(investmentDocRef, {
             name: pkg.name,
             price: pkg.price,
             dailyReturn: pkg.dailyReturn,
@@ -111,11 +112,6 @@ export default function InvestPage() {
             startDate: serverTimestamp(),
             status: "active",
         });
-
-        // Create earnings log if it doesn't exist
-        if (!earningsLogDoc.exists()) {
-            transaction.set(earningsLogDocRef, { lastCalculated: new Date(0) }); // Set to epoch
-        }
       });
 
       toast({
