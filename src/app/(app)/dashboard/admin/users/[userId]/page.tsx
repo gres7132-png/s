@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,28 +36,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import { updateUserStatus, listAllUsers, UserData } from "@/ai/flows/user-management";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-const profileSchema = z.object({
-  displayName: z.string().min(1, "Full name is required.").optional(),
-  email: z.string().email("Invalid email address.").optional(),
+
+const bankingDetailsSchema = z.object({
+    paymentMethod: z.enum(["mobile", "crypto", "minipay"], { required_error: "Please select a payment method." }),
+    mobileNumber: z.string().optional(),
+    minipayNumber: z.string().optional(),
+    cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
+    cryptoAddress: z.string().optional(),
+}).refine(data => {
+    if (data.paymentMethod === "mobile") return !!data.mobileNumber && data.mobileNumber.length > 0;
+    if (data.paymentMethod === "minipay") return !!data.minipayNumber && data.minipayNumber.length > 0;
+    if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress && data.cryptoAddress.length > 0;
+    return true;
+}, {
+    message: "Please fill in the required details for the selected payment method.",
+    path: ["paymentMethod"],
 });
 
-type ProfileFormValues = z.infer<typeof profileSchema>;
-
-interface PaymentDetails {
-    paymentMethod: 'mobile' | 'crypto' | 'minipay';
-    mobileNumber?: string;
-    minipayNumber?: string;
-    cryptoCurrency?: 'BTC' | 'ETH' | 'USDT';
-    cryptoAddress?: string;
-}
+type BankingDetailsFormValues = z.infer<typeof bankingDetailsSchema>;
 
 export default function UserDetailsPage({ params }: { params: { userId: string } }) {
   const { userId } = params;
@@ -64,16 +76,26 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const { isAdmin, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
-  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
   const [referrals, setReferrals] = useState([]);
   const [transactions, setTransactions] = useState({ deposits: [], withdrawals: [] });
 
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
+  const profileForm = useForm<{displayName: string, email: string}>({
     defaultValues: {
       displayName: "",
       email: "",
+    },
+  });
+
+  const paymentForm = useForm<BankingDetailsFormValues>({
+    resolver: zodResolver(bankingDetailsSchema),
+     defaultValues: {
+      paymentMethod: "mobile",
+      mobileNumber: "",
+      minipayNumber: "",
+      cryptoCurrency: undefined,
+      cryptoAddress: "",
     },
   });
   
@@ -84,16 +106,15 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         const currentUser = users.find(u => u.uid === userId);
         if (currentUser) {
             setUser(currentUser);
-            form.reset({
+            profileForm.reset({
                 displayName: currentUser.displayName || "",
                 email: currentUser.email || "",
             });
             
-            // Fetch payment details
             const paymentDetailsRef = doc(db, "userPaymentDetails", userId);
             const paymentDetailsSnap = await getDoc(paymentDetailsRef);
             if (paymentDetailsSnap.exists()) {
-                setPaymentDetails(paymentDetailsSnap.data() as PaymentDetails);
+                paymentForm.reset(paymentDetailsSnap.data() as BankingDetailsFormValues);
             }
 
         } else {
@@ -104,7 +125,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     } finally {
         setLoading(false);
     }
-  }, [userId, form, toast]);
+  }, [userId, profileForm, paymentForm, toast]);
 
 
   useEffect(() => {
@@ -113,8 +134,21 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     }
   }, [userId, isAdmin, fetchUserData]);
 
-  async function onSubmit(values: ProfileFormValues) {
-    toast({ title: "Note", description: "Updating user profile details from the admin panel requires the Firebase Admin SDK and is disabled in this prototype." });
+  async function onPaymentDetailsSubmit(values: BankingDetailsFormValues) {
+    setIsSavingDetails(true);
+    try {
+        const detailsDocRef = doc(db, "userPaymentDetails", userId);
+        await setDoc(detailsDocRef, values, { merge: true });
+        toast({
+            title: "Payment Details Updated",
+            description: `Successfully updated payment information for ${user?.displayName}.`,
+        });
+    } catch (error) {
+         console.error("Error saving payment details:", error);
+         toast({ variant: "destructive", title: "Save Failed", description: "Could not save payment details."});
+    } finally {
+        setIsSavingDetails(false);
+    }
   }
 
   const handleToggleSuspend = async () => {
@@ -163,15 +197,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
      );
   }
 
-  const renderPaymentDetail = (label: string, value?: string) => {
-    if (!value) return null;
-    return (
-      <div className="flex justify-between items-center text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono text-right break-all">{value}</span>
-      </div>
-    );
-  };
+  const selectedPaymentMethod = paymentForm.watch("paymentMethod");
 
   return (
     <div className="space-y-8">
@@ -185,8 +211,8 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-8">
           <Card>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
+            <Form {...profileForm}>
+              <form>
                 <CardHeader>
                   <CardTitle>User Profile</CardTitle>
                 </CardHeader>
@@ -197,41 +223,130 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                       <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
                     </Avatar>
                   </div>
-                  <FormField control={form.control} name="displayName" render={({ field }) => (
-                      <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem>
+                  <FormField control={profileForm.control} name="displayName" render={({ field }) => (
+                      <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl></FormItem>
                   )}/>
-                  <FormField control={form.control} name="email" render={({ field }) => (
-                      <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted"/></FormControl><FormMessage /></FormItem>
+                  <FormField control={profileForm.control} name="email" render={({ field }) => (
+                      <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted"/></FormControl></FormItem>
                   )}/>
                 </CardContent>
-                <CardFooter>
-                  <Button type="submit" disabled>Save Changes</Button>
-                </CardFooter>
               </form>
             </Form>
           </Card>
           
            <Card>
-            <CardHeader>
-                <div className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-muted-foreground"/>
-                    <CardTitle>Payment Details</CardTitle>
-                </div>
-              <CardDescription>Withdrawal information saved by the user.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {paymentDetails ? (
-                    <>
-                        {renderPaymentDetail("Method", paymentDetails.paymentMethod)}
-                        {renderPaymentDetail("Mobile Number", paymentDetails.mobileNumber)}
-                        {renderPaymentDetail("Minipay Number", paymentDetails.minipayNumber)}
-                        {renderPaymentDetail("Crypto Currency", paymentDetails.cryptoCurrency)}
-                        {renderPaymentDetail("Crypto Address", paymentDetails.cryptoAddress)}
-                    </>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No payment details saved.</p>
-                )}
-            </CardContent>
+            <Form {...paymentForm}>
+              <form onSubmit={paymentForm.handleSubmit(onPaymentDetailsSubmit)}>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-muted-foreground"/>
+                        <CardTitle>Payment Details</CardTitle>
+                    </div>
+                  <CardDescription>Withdrawal information saved by the user.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <FormField
+                        control={paymentForm.control}
+                        name="paymentMethod"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Payment Method</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger disabled={isSavingDetails}>
+                                  <SelectValue placeholder="Select a payment method" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="minipay">Minipay</SelectItem>
+                                <SelectItem value="mobile">Mobile Money</SelectItem>
+                                <SelectItem value="crypto">Crypto Wallet</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {selectedPaymentMethod === "mobile" && (
+                        <FormField
+                          control={paymentForm.control}
+                          name="mobileNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. 0712345678" {...field} disabled={isSavingDetails} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {selectedPaymentMethod === "minipay" && (
+                        <FormField
+                          control={paymentForm.control}
+                          name="minipayNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Minipay Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. 0781309701" {...field} disabled={isSavingDetails} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {selectedPaymentMethod === "crypto" && (
+                        <div className="space-y-4">
+                          <FormField
+                            control={paymentForm.control}
+                            name="cryptoCurrency"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Cryptocurrency</FormLabel>
+                                 <Select onValueChange={field.onChange} value={field.value} disabled={isSavingDetails}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select a currency" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
+                                    <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
+                                    <SelectItem value="USDT">Tether (USDT)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                            control={paymentForm.control}
+                            name="cryptoAddress"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Wallet Address</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter wallet address" {...field} disabled={isSavingDetails} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" className="w-full" disabled={isSavingDetails}>
+                        {isSavingDetails ? <Loader2 className="animate-spin" /> : "Save Payment Details"}
+                    </Button>
+                </CardFooter>
+              </form>
+            </Form>
           </Card>
 
            <Card>
@@ -317,3 +432,6 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     </div>
   );
 }
+
+
+    
