@@ -111,7 +111,6 @@ export function AuthForm() {
       );
       const newUser = userCredential.user;
 
-      // After user is created in Auth, update their profile and Firestore docs
       await updateProfile(newUser, {
         displayName: values.fullName,
       });
@@ -125,6 +124,7 @@ export function AuthForm() {
         email: values.email,
         createdAt: serverTimestamp(),
         referredBy: values.referralCode || null,
+        hasActiveInvestment: false, // Initialize hasActiveInvestment flag
       });
 
       // 2. Set the user stats document
@@ -136,16 +136,8 @@ export function AuthForm() {
         withdrawalAmount: 0,
       });
       
-      // 3. If there's a referral code, set that in the referrer's subcollection
-      if (values.referralCode) {
-        const referrerRef = doc(db, 'users', values.referralCode, 'referrals', newUser.uid);
-        // This write is now separate and its permissions are handled by a different rule
-        await setDoc(referrerRef, {
-            displayName: values.fullName,
-            email: values.email,
-            joinedAt: serverTimestamp(),
-        });
-      }
+      // The old logic for creating a subcollection on the referrer's doc is inefficient.
+      // The `referredBy` field on the new user's doc is now the source of truth.
 
       await batch.commit();
 

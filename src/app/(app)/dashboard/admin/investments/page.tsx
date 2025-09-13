@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Loader2, PlusCircle, Trash2 } from "lucide-react";
+import { Loader2, PlusCircle, Trash2, Pencil, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
 
 
 const packageSchema = z.object({
@@ -67,6 +67,7 @@ export default function ManageInvestmentsPage() {
   const [packages, setPackages] = useState<InvestmentPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
@@ -98,26 +99,38 @@ export default function ManageInvestmentsPage() {
 
     return () => unsubscribe();
   }, [isAdmin, toast]);
+  
+  const resetForm = () => {
+    form.reset({ name: "", price: 0, dailyReturn: 0, duration: 0, totalReturn: 0 });
+    setEditingId(null);
+  };
 
   async function onSubmit(values: PackageFormValues) {
     setFormLoading(true);
     try {
-      await addDoc(collection(db, "silverLevelPackages"), values);
-      form.reset({ name: "", price: 0, dailyReturn: 0, duration: 0, totalReturn: 0 });
-      toast({
-        title: "Package Added",
-        description: `${values.name} has been successfully created.`,
-      });
+      if (editingId) {
+        await setDoc(doc(db, "silverLevelPackages", editingId), values);
+        toast({ title: "Package Updated", description: `${values.name} has been successfully updated.` });
+      } else {
+        await addDoc(collection(db, "silverLevelPackages"), values);
+        toast({ title: "Package Added", description: `${values.name} has been successfully created.` });
+      }
+      resetForm();
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Action Failed",
-        description: "Could not add the package. Please try again.",
+        description: "Could not save the package. Please try again.",
       });
     } finally {
       setFormLoading(false);
     }
   }
+  
+  const handleEdit = (pkg: InvestmentPackage) => {
+    setEditingId(pkg.id);
+    form.reset(pkg);
+  };
 
   const handleDelete = async (packageId: string) => {
     try {
@@ -150,9 +163,9 @@ export default function ManageInvestmentsPage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <CardHeader>
-                  <CardTitle>Add New Package</CardTitle>
+                  <CardTitle>{editingId ? "Edit Package" : "Add New Package"}</CardTitle>
                   <CardDescription>
-                    Fill out the details for the new investment product.
+                    {editingId ? "Modify the details of this package." : "Fill out the details for the new investment product."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -172,11 +185,16 @@ export default function ManageInvestmentsPage() {
                     <FormItem><FormLabel>Total Return (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex justify-between">
                   <Button type="submit" disabled={formLoading}>
-                    {formLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
-                    Add Package
+                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <PlusCircle />}
+                    {editingId ? "" : "Add Package"}
                   </Button>
+                  {editingId && (
+                     <Button variant="ghost" onClick={resetForm} type="button">
+                        <X className="h-4 w-4 mr-2" /> Cancel
+                    </Button>
+                  )}
                 </CardFooter>
               </form>
             </Form>
@@ -211,6 +229,9 @@ export default function ManageInvestmentsPage() {
                                     <TableCell>{formatCurrency(pkg.dailyReturn)}</TableCell>
                                     <TableCell>{pkg.duration} Days</TableCell>
                                     <TableCell className="text-right">
+                                         <Button variant="ghost" size="icon" onClick={() => handleEdit(pkg)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80">

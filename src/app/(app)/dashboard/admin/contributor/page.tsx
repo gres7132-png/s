@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Loader2, PlusCircle, Trash2 } from "lucide-react";
+import { Loader2, PlusCircle, Trash2, Pencil, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -48,7 +48,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
 
 const tierSchema = z.object({
   level: z.string().min(1, "Level identifier is required (e.g., V1)."),
@@ -66,6 +66,7 @@ export default function ManageContributorPage() {
   const [tiers, setTiers] = useState<ContributorTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const form = useForm<TierFormValues>({
     resolver: zodResolver(tierSchema),
@@ -97,25 +98,37 @@ export default function ManageContributorPage() {
     return () => unsubscribe();
   }, [isAdmin, toast]);
 
+  const resetForm = () => {
+    form.reset({ level: "", monthlyIncome: 0, purchasedProducts: 0, deposit: 0 });
+    setEditingId(null);
+  };
+
   async function onSubmit(values: TierFormValues) {
     setFormLoading(true);
     try {
-      await addDoc(collection(db, "distributorTiers"), values);
-      form.reset({ level: "", monthlyIncome: 0, purchasedProducts: 0, deposit: 0 });
-      toast({
-        title: "Tier Added",
-        description: `Contributor level ${values.level} has been successfully created.`,
-      });
+      if (editingId) {
+        await setDoc(doc(db, "distributorTiers", editingId), values);
+        toast({ title: "Tier Updated", description: `Contributor level ${values.level} has been updated.` });
+      } else {
+        await addDoc(collection(db, "distributorTiers"), values);
+        toast({ title: "Tier Added", description: `Contributor level ${values.level} has been created.` });
+      }
+      resetForm();
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Action Failed",
-        description: "Could not add the tier. Please try again.",
+        description: "Could not save the tier. Please try again.",
       });
     } finally {
       setFormLoading(false);
     }
   }
+
+  const handleEdit = (tier: ContributorTier) => {
+    setEditingId(tier.id);
+    form.reset(tier);
+  };
 
   const handleDelete = async (tierId: string) => {
     try {
@@ -148,9 +161,9 @@ export default function ManageContributorPage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <CardHeader>
-                  <CardTitle>Add New Tier</CardTitle>
+                  <CardTitle>{editingId ? "Edit Tier" : "Add New Tier"}</CardTitle>
                   <CardDescription>
-                    Fill out the details for the new contributor level.
+                    {editingId ? "Modify the details for this contributor level." : "Fill out the details for the new contributor level."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -167,11 +180,16 @@ export default function ManageContributorPage() {
                     <FormItem><FormLabel>Deposit (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex justify-between">
                   <Button type="submit" disabled={formLoading}>
-                    {formLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
-                    Add Tier
+                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <PlusCircle />}
+                     {editingId ? "" : "Add Tier"}
                   </Button>
+                  {editingId && (
+                     <Button variant="ghost" onClick={resetForm} type="button">
+                        <X className="h-4 w-4 mr-2" /> Cancel
+                    </Button>
+                  )}
                 </CardFooter>
               </form>
             </Form>
@@ -206,6 +224,9 @@ export default function ManageContributorPage() {
                                     <TableCell>{tier.purchasedProducts}</TableCell>
                                     <TableCell>{formatCurrency(tier.deposit)}</TableCell>
                                     <TableCell className="text-right">
+                                        <Button variant="ghost" size="icon" onClick={() => handleEdit(tier)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80">

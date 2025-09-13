@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy, getDoc } from "firebase/firestore";
 import { processReferral } from "@/ai/flows/user-management";
 
 interface InvestmentPackage {
@@ -90,8 +90,10 @@ export default function InvestPage() {
     try {
       await runTransaction(db, async (transaction) => {
         const userStatsDocRef = doc(db, "userStats", user.uid);
+        const userDocRef = doc(db, "users", user.uid);
         
         const userStatsDoc = await transaction.get(userStatsDocRef);
+        const userDoc = await transaction.get(userDocRef);
 
         const currentBalance = userStatsDoc.exists() ? userStatsDoc.data().availableBalance : 0;
         if (currentBalance < pkg.price) {
@@ -113,15 +115,17 @@ export default function InvestPage() {
             startDate: serverTimestamp(),
             status: "active",
         });
+
+        // 3. Set hasActiveInvestment to true on the user document if it's not already set
+        if (userDoc.exists() && !userDoc.data().hasActiveInvestment) {
+          transaction.update(userDocRef, { hasActiveInvestment: true });
+        }
       });
 
-      // 3. After successful transaction, process the referral commission in the background.
-      // This is done outside the transaction to avoid contention and because it can be eventual.
+      // 4. After successful transaction, process the referral commission via the secure backend flow.
       try {
         await processReferral({ investorId: user.uid, investmentAmount: pkg.price });
       } catch (referralError: any) {
-        // Log the error but don't fail the main investment toast.
-        // The user's investment was successful, which is the primary feedback they need.
         console.error("Referral processing failed:", referralError.message);
       }
 

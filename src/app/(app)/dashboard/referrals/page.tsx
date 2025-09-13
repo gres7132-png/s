@@ -25,14 +25,14 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, getDocs, doc, getDoc, where } from "firebase/firestore";
 
 // This interface defines the structure for a referred user object.
 interface ReferredUser {
     id: string;
-    name: string;
+    displayName: string;
     capital: number;
-    commissionEarned: number; // Renamed for clarity
+    commissionEarned: number;
     status: 'Active' | 'Pending';
 }
 
@@ -47,13 +47,13 @@ export default function ReferralsPage() {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
       
-      const referralsColRef = collection(db, "users", user.uid, "referrals");
+      const referralsQuery = query(collection(db, "users"), where("referredBy", "==", user.uid));
       
-      const unsubscribe = onSnapshot(referralsColRef, async (snapshot) => {
+      const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
         setLoading(true);
-        const usersPromises = snapshot.docs.map(async (refDoc) => {
-            const referredUserId = refDoc.id;
-            const referredUserData = refDoc.data();
+        const usersPromises = snapshot.docs.map(async (userDoc) => {
+            const referredUserId = userDoc.id;
+            const referredUserData = userDoc.data();
 
             // Get the total investment for this referred user
             const investmentsColRef = collection(db, "users", referredUserId, "investments");
@@ -69,7 +69,7 @@ export default function ReferralsPage() {
 
             return {
                 id: referredUserId,
-                name: referredUserData.displayName,
+                displayName: referredUserData.displayName,
                 capital: totalInvested,
                 commissionEarned: commission,
                 status: status,
@@ -94,7 +94,6 @@ export default function ReferralsPage() {
     });
   };
 
-  // This now represents the total commission you have already earned from these referrals
   const totalCommission = referredUsers.reduce((sum, u) => sum + u.commissionEarned, 0);
 
   return (
@@ -170,7 +169,7 @@ export default function ReferralsPage() {
               ) : referredUsers.length > 0 ? (
                 referredUsers.map((refUser) => (
                   <TableRow key={refUser.id}>
-                    <TableCell className="font-medium">{refUser.name}</TableCell>
+                    <TableCell className="font-medium">{refUser.displayName}</TableCell>
                     <TableCell>{formatCurrency(refUser.capital)}</TableCell>
                     <TableCell>{formatCurrency(refUser.commissionEarned)}</TableCell>
                     <TableCell>

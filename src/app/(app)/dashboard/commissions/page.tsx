@@ -22,7 +22,7 @@ import { Users, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, getDocs, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
 
 interface CommissionTier {
     id: string;
@@ -35,7 +35,7 @@ export default function AgentCommissionsPage() {
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [userActiveReferrals, setUserActiveReferrals] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loadingReferrals, setLoadingReferrals] = useState(true);
   
   useEffect(() => {
     const q = query(collection(db, "commissionTiers"), orderBy("referrals"));
@@ -56,27 +56,20 @@ export default function AgentCommissionsPage() {
 
   useEffect(() => {
     if (user) {
-      setLoading(true);
-      const referralsColRef = collection(db, "users", user.uid, "referrals");
+      setLoadingReferrals(true);
+      // Efficiently query for users who were referred by the current user and have active investments.
+      const referralsQuery = query(
+          collection(db, "users"),
+          where("referredBy", "==", user.uid),
+          where("hasActiveInvestment", "==", true)
+      );
       
-      const unsubscribe = onSnapshot(referralsColRef, async (snapshot) => {
-        const referredUserIds = snapshot.docs.map(doc => doc.id);
-        let activeReferralCount = 0;
-
-        if (referredUserIds.length > 0) {
-            // Check each referred user for active investments
-            for (const referredUserId of referredUserIds) {
-                const investmentsColRef = collection(db, "users", referredUserId, "investments");
-                const activeInvestmentsQuery = query(investmentsColRef, where("status", "==", "active"));
-                const investmentsSnapshot = await getDocs(activeInvestmentsQuery);
-                if (!investmentsSnapshot.empty) {
-                    activeReferralCount++;
-                }
-            }
-        }
-        
-        setUserActiveReferrals(activeReferralCount);
-        setLoading(false);
+      const unsubscribe = onSnapshot(referralsQuery, (snapshot) => {
+        setUserActiveReferrals(snapshot.size);
+        setLoadingReferrals(false);
+      }, (error) => {
+        console.error("Error fetching active referrals:", error);
+        setLoadingReferrals(false);
       });
 
       return () => unsubscribe();
@@ -87,6 +80,8 @@ export default function AgentCommissionsPage() {
     .slice()
     .reverse()
     .find(tier => userActiveReferrals >= tier.referrals)?.commission || 0;
+  
+  const loading = loadingTiers || loadingReferrals;
 
   return (
     <div className="space-y-8">
@@ -111,7 +106,7 @@ export default function AgentCommissionsPage() {
             <CardTitle>YOUR CURRENT MONTHLY COMMISSION</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold text-primary">{loadingTiers ? <Loader2 className="animate-spin" /> : formatCurrency(currentCommission)}</p>
+            <p className="text-4xl font-bold text-primary">{loading ? <Loader2 className="animate-spin" /> : formatCurrency(currentCommission)}</p>
           </CardContent>
         </Card>
       </div>
@@ -134,14 +129,16 @@ export default function AgentCommissionsPage() {
             <TableBody>
               {loadingTiers ? (
                  <TableRow><TableCell colSpan={2} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
-              ) : commissionTiers.map((tier) => (
+              ) : commissionTiers.length > 0 ? commissionTiers.map((tier) => (
                 <TableRow key={tier.id} className={userActiveReferrals >= tier.referrals ? "bg-secondary" : ""}>
                   <TableCell className="font-medium">
                     {tier.referrals}{commissionTiers[commissionTiers.length - 1].referrals === tier.referrals ? "+" : ""} Active Investors
                   </TableCell>
                   <TableCell className="text-right font-bold text-accent">{formatCurrency(tier.commission)}</TableCell>
                 </TableRow>
-              ))}
+              )) : (
+                 <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">No tiers defined.</TableCell></TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

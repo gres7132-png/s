@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Loader2, PlusCircle, Trash2 } from "lucide-react";
+import { Loader2, PlusCircle, Trash2, Pencil, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import {
   AlertDialog,
@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
 
 
 const tierSchema = z.object({
@@ -64,6 +64,7 @@ export default function ManageCommissionsPage() {
   const [tiers, setTiers] = useState<CommissionTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const form = useForm<TierFormValues>({
     resolver: zodResolver(tierSchema),
@@ -93,25 +94,37 @@ export default function ManageCommissionsPage() {
     return () => unsubscribe();
   }, [isAdmin, toast]);
 
+  const resetForm = () => {
+    form.reset({ referrals: 0, commission: 0 });
+    setEditingId(null);
+  };
+
   async function onSubmit(values: TierFormValues) {
     setFormLoading(true);
     try {
-      await addDoc(collection(db, "commissionTiers"), values);
-      form.reset({ referrals: 0, commission: 0 });
-      toast({
-        title: "Tier Added",
-        description: `Commission tier for ${values.referrals} referrals has been created.`,
-      });
+      if (editingId) {
+        await setDoc(doc(db, "commissionTiers", editingId), values);
+        toast({ title: "Tier Updated", description: `Commission tier for ${values.referrals} referrals has been updated.` });
+      } else {
+        await addDoc(collection(db, "commissionTiers"), values);
+        toast({ title: "Tier Added", description: `Commission tier for ${values.referrals} referrals has been created.` });
+      }
+      resetForm();
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Action Failed",
-        description: "Could not add the tier. Please try again.",
+        description: "Could not save the tier. Please try again.",
       });
     } finally {
       setFormLoading(false);
     }
   }
+  
+  const handleEdit = (tier: CommissionTier) => {
+    setEditingId(tier.id);
+    form.reset(tier);
+  };
 
   const handleDelete = async (tierId: string) => {
     try {
@@ -144,9 +157,9 @@ export default function ManageCommissionsPage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <CardHeader>
-                  <CardTitle>Add New Tier</CardTitle>
+                  <CardTitle>{editingId ? "Edit Tier" : "Add New Tier"}</CardTitle>
                   <CardDescription>
-                    Define a new commission level for agents.
+                    {editingId ? "Modify the details for this commission level." : "Define a new commission level for agents."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -157,11 +170,16 @@ export default function ManageCommissionsPage() {
                     <FormItem><FormLabel>Monthly Commission (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex justify-between">
                   <Button type="submit" disabled={formLoading}>
-                    {formLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
-                    Add Tier
+                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <PlusCircle />}
+                    {editingId ? "" : "Add Tier"}
                   </Button>
+                  {editingId && (
+                     <Button variant="ghost" onClick={resetForm} type="button">
+                        <X className="h-4 w-4 mr-2" /> Cancel
+                    </Button>
+                  )}
                 </CardFooter>
               </form>
             </Form>
@@ -192,6 +210,9 @@ export default function ManageCommissionsPage() {
                                     <TableCell className="font-medium">{tier.referrals}+</TableCell>
                                     <TableCell>{formatCurrency(tier.commission)}</TableCell>
                                     <TableCell className="text-right">
+                                        <Button variant="ghost" size="icon" onClick={() => handleEdit(tier)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80">

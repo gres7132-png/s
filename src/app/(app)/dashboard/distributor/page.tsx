@@ -36,7 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, doc, getDocs, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, where } from "firebase/firestore";
 
 interface ContributorTier {
   id: string;
@@ -47,7 +47,7 @@ interface ContributorTier {
 }
 
 interface ContributorData {
-    referredUsersCount: number;
+    activeReferralsCount: number;
     userBalance: number;
 }
 
@@ -59,7 +59,7 @@ export default function DistributorPage() {
   const [isApplying, setIsApplying] = useState(false);
   const [selectedTier, setSelectedTier] = useState<ContributorTier | null>(null);
   const [contributorData, setContributorData] = useState<ContributorData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
     const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
@@ -80,41 +80,34 @@ export default function DistributorPage() {
 
   useEffect(() => {
     if (user) {
-        setLoading(true);
+        setLoadingData(true);
         const userStatsRef = doc(db, "userStats", user.uid);
-        const referralsColRef = collection(db, "users", user.uid, "referrals");
-
-        // Fetch balance
+        
         const unsubStats = onSnapshot(userStatsRef, (doc) => {
             setContributorData(prev => ({
                 ...prev,
                 userBalance: doc.exists() ? doc.data().availableBalance || 0 : 0,
-                referredUsersCount: prev?.referredUsersCount || 0,
+                activeReferralsCount: prev?.activeReferralsCount || 0,
             }));
         });
 
-        // Fetch and count active referrals
-        const unsubReferrals = onSnapshot(referralsColRef, async (snapshot) => {
-            const referredUserIds = snapshot.docs.map(doc => doc.id);
-            let activeReferralCount = 0;
-
-            if (referredUserIds.length > 0) {
-                for (const referredUserId of referredUserIds) {
-                    const investmentsColRef = collection(db, "users", referredUserId, "investments");
-                    const activeInvestmentsQuery = query(investmentsColRef, where("status", "==", "active"));
-                    const investmentsSnapshot = await getDocs(activeInvestmentsQuery);
-                    if (!investmentsSnapshot.empty) {
-                        activeReferralCount++;
-                    }
-                }
-            }
-
+        // Efficiently query for users who were referred by the current user and have active investments.
+        const referralsQuery = query(
+            collection(db, "users"),
+            where("referredBy", "==", user.uid),
+            where("hasActiveInvestment", "==", true)
+        );
+      
+        const unsubReferrals = onSnapshot(referralsQuery, (snapshot) => {
             setContributorData(prev => ({
-                ...prev,
+                 ...prev,
                 userBalance: prev?.userBalance || 0,
-                referredUsersCount: activeReferralCount,
+                activeReferralsCount: snapshot.size,
             }));
-            setLoading(false);
+            setLoadingData(false);
+        }, (error) => {
+            console.error("Error fetching active referrals:", error);
+            setLoadingData(false);
         });
         
         return () => {
@@ -142,14 +135,9 @@ export default function DistributorPage() {
     setIsApplying(true);
     
     try {
-        // --- Backend Logic Placeholder ---
-        // Here you would call a backend function to:
-        // 1. Deduct the deposit from the user's balance.
-        // 2. Mark the user as having applied for the contributor level.
-        // e.g., await applyForDistributor(user.uid, selectedTier.level);
+        // This is a placeholder. In a real application, this would trigger a secure backend flow.
         console.log(`Processing application for ${selectedTier.level}...`);
         
-
         toast({
           title: "Application Successful!",
           description: `You have applied for the ${selectedTier.level} contributor level. Your application is now pending approval.`,
@@ -174,7 +162,7 @@ export default function DistributorPage() {
     setSelectedTier(null);
   };
 
-  const prerequisiteMet = (contributorData?.referredUsersCount ?? 0) >= 2;
+  const prerequisiteMet = (contributorData?.activeReferralsCount ?? 0) >= 2;
 
   return (
     <>
@@ -186,14 +174,14 @@ export default function DistributorPage() {
           </p>
         </div>
 
-        {loading ? (
+        {loadingData ? (
            <Skeleton className="h-16 w-full" />
         ) : !prerequisiteMet && (
           <Alert>
               <Users className="h-4 w-4" />
               <AlertTitle>Prerequisite Not Met</AlertTitle>
               <AlertDescription>
-                  You must refer at least two users who have made an investment before you can apply to become a contributor. You currently have {contributorData?.referredUsersCount} active referral(s).
+                  You must refer at least two users who have made an investment before you can apply to become a contributor. You currently have {contributorData?.activeReferralsCount} active referral(s).
               </AlertDescription>
           </Alert>
         )}
@@ -231,7 +219,7 @@ export default function DistributorPage() {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        disabled={loading || !prerequisiteMet}
+                        disabled={loadingData || !prerequisiteMet}
                         onClick={() => handleApplyClick(tier)}
                       >
                         Apply
