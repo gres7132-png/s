@@ -22,69 +22,55 @@ function isAdmin() {
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // --- User Profile Data ---
-    // Users can read/write their own profile. Admins have full access.
-    match /users/{userId} {
+    // --- User-Specific Data ---
+    // Users can manage their own data. Admins have universal access to all user data.
+    match /users/{userId}/{documents=**} {
       allow read, write: if isOwner(userId) || isAdmin();
     }
     
-    // --- User Investments ---
-    // A user can manage their own investments. Admins have full access.
-    match /users/{userId}/investments/{investmentId} {
-      allow read, write: if isOwner(userId) || isAdmin();
-    }
-    
-    // --- User Financial Stats ---
-    // A user can read their own stats. Only admins can update balances.
+    // --- User Stats, Payment Details, and Profiles ---
+    // These collections follow the same pattern: users manage their own, admins manage all.
     match /userStats/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      // Create is allowed for a user on signup.
-      allow create: if isOwner(userId); 
-      allow update: if isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
     }
-    
-    // --- User Payment Details ---
-    // A user can manage their own payment details. Admins have full access.
     match /userPaymentDetails/{userId} {
-       allow read, write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /users/{userId} {
+      // Admins can delete user documents, users cannot.
+      allow read, create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // --- Deposit Proofs ---
-    // Authenticated users can create deposit proofs. Admins can manage all of them.
+    // --- Platform-Wide Configuration (Admin Writable) ---
+    // Any authenticated user can read these, but only admins can modify them.
+    match /silverLevelPackages/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /contributorTiers/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /commissionTiers/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // --- Transaction Requests (Deposits & Withdrawals) ---
+    // Any authenticated user can create a request. Admins can read/update/delete all of them.
+    // Users can read their own transaction history.
     match /transactionProofs/{proofId} {
-        allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin();
-    }
-    
-    // --- Withdrawal Requests ---
-    // Authenticated users can create withdrawal requests. Admins can manage all of them.
-    match /withdrawalRequests/{reqId} {
-        allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin();
-    }
-
-    // --- Contributor Applications ---
-    // Authenticated users can apply. Admins can manage all of them.
-    match /contributorApplications/{appId} {
       allow create: if isAuthenticated();
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin() || (isOwner(request.resource.data.userId));
     }
-
-    // --- Public, Admin-Managed Collections ---
-    // Any authenticated user can read these, but only admins can write to them.
-    match /silverLevelPackages/{packageId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+    match /withdrawalRequests/{reqId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin() || (isOwner(request.resource.data.userId));
     }
-
-    match /contributorTiers/{tierId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-    
-    match /commissionTiers/{tierId} {
-        allow read: if isAuthenticated();
-        allow write: if isAdmin();
+     match /contributorApplications/{appId} {
+        allow create: if isAuthenticated();
+        allow read, update, delete: if isAdmin() || (isOwner(request.resource.data.userId));
     }
   }
 }
