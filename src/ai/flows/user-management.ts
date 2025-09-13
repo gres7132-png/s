@@ -4,23 +4,24 @@
 /**
  * @fileOverview User management flows for administrators.
  * IMPORTANT: This flow now contains the production-ready implementation for user management.
- * In a real environment, you would need to initialize the Firebase Admin SDK.
- * For this prototype, the functions will still simulate the behavior.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-// In a real environment, you would uncomment these lines and configure the Admin SDK
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
 if (!getApps().length) {
-  try {
-    initializeApp({
-      credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG!))
-    });
-  } catch (e) {
-    console.error("Admin SDK initialization failed. Ensure FIREBASE_ADMIN_SDK_CONFIG is set correctly in your .env file.");
+  if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
+    console.error("FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
+  } else {
+    try {
+      initializeApp({
+        credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG))
+      });
+    } catch (e: any) {
+      console.error("Admin SDK initialization failed:", e.message);
+    }
   }
 }
 
@@ -53,7 +54,7 @@ export type UpdateUserStatusInput = z.infer<typeof UpdateUserStatusInputSchema>;
  */
 export async function listAllUsers(): Promise<ListUsersOutput> {
   if (!getApps().length) {
-    throw new Error("Admin SDK not initialized. Cannot list users.");
+    throw new Error("Admin SDK is not configured. Please check server environment variables.");
   }
   const auth = getAuth();
   const userRecords = await auth.listUsers();
@@ -74,7 +75,7 @@ export async function listAllUsers(): Promise<ListUsersOutput> {
  */
 export async function updateUserStatus(input: UpdateUserStatusInput): Promise<{success: boolean}> {
     if (!getApps().length) {
-      throw new Error("Admin SDK not initialized. Cannot update user status.");
+      throw new Error("Admin SDK is not configured. Please check server environment variables.");
     }
     const auth = getAuth();
     await auth.updateUser(input.uid, { disabled: input.disabled });
@@ -93,4 +94,3 @@ ai.defineFlow({
     inputSchema: UpdateUserStatusInputSchema,
     outputSchema: z.object({ success: z.boolean() }),
 }, updateUserStatus);
-

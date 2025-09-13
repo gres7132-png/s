@@ -15,23 +15,28 @@ import { getAuth } from 'firebase-admin/auth';
 
 // Initialize Firebase Admin SDK if not already initialized
 if (!getApps().length) {
-  try {
-    initializeApp({
-      credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG!))
-    });
-  } catch (e) {
-    console.error("Admin SDK initialization failed. Ensure FIREBASE_ADMIN_SDK_CONFIG is set.");
+  if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
+    console.error("FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
+  } else {
+    try {
+      initializeApp({
+        credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG))
+      });
+    } catch (e: any) {
+      console.error("Admin SDK initialization failed:", e.message);
+    }
   }
 }
 
-const db = getFirestore();
-const auth = getAuth();
-
 // --- Helper to verify admin status ---
 async function verifyAdmin(flow: any) {
+    if (!getApps().length) {
+        throw new Error("Admin SDK is not configured. Check server environment variables.");
+    }
     if (!flow.auth) {
         throw new Error("Authentication is required.");
     }
+    const auth = getAuth();
     const user = await auth.getUser(flow.auth.uid);
     const ADMIN_EMAILS = ["gres7132@gmail.com"]; // Keep this in sync with use-auth.tsx
     if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
@@ -58,10 +63,7 @@ export const updateBalance = ai.defineFlow(
   },
   async (input, flow) => {
     await verifyAdmin(flow);
-    
-    if (!getApps().length) {
-      throw new Error("Admin SDK not initialized. Cannot perform backend operations.");
-    }
+    const db = getFirestore();
     const userStatsRef = db.doc(`userStats/${input.userId}`);
     await userStatsRef.set({
       availableBalance: input.newBalance
@@ -91,6 +93,7 @@ export const updateInvestment = ai.defineFlow(
   },
   async (input, flow) => {
     await verifyAdmin(flow);
+    const db = getFirestore();
     const investmentRef = db.doc(`users/${input.userId}/investments/${input.investmentId}`);
     await investmentRef.update({
       price: input.price,
@@ -118,9 +121,9 @@ export const deleteInvestment = ai.defineFlow(
   },
   async (input, flow) => {
     await verifyAdmin(flow);
+    const db = getFirestore();
     const investmentRef = db.doc(`users/${input.userId}/investments/${input.investmentId}`);
     await investmentRef.delete();
     return { success: true };
   }
 );
-

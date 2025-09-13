@@ -13,16 +13,18 @@ import { getApps, initializeApp, cert } from 'firebase-admin/app';
 
 // Initialize Firebase Admin SDK
 if (!getApps().length) {
-  try {
-    initializeApp({
-      credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG!))
-    });
-  } catch (e) {
-    console.error("Admin SDK initialization failed. Ensure FIREBASE_ADMIN_SDK_CONFIG is set in your environment.");
+  if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
+    console.error("FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
+  } else {
+    try {
+      initializeApp({
+        credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG))
+      });
+    } catch (e: any) {
+      console.error("Admin SDK initialization failed:", e.message);
+    }
   }
 }
-
-const db = getFirestore();
 
 const CalculateEarningsOutputSchema = z.object({
     success: z.boolean(),
@@ -34,10 +36,11 @@ type CalculateEarningsOutput = z.infer<typeof CalculateEarningsOutputSchema>;
 
 async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
     if (!getApps().length) {
-        throw new Error("Admin SDK not initialized. Cannot perform backend operations.");
+        throw new Error("Admin SDK is not configured. Check server environment variables.");
     }
     console.log("Starting daily earnings calculation...");
-
+    
+    const db = getFirestore();
     const earningsByUid: { [key: string]: number } = {};
 
     // 1. Fetch all active investments across all users
