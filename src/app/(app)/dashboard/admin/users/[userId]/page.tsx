@@ -322,7 +322,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                         />
                   </CardContent>
                   <CardFooter>
-                      <Button type="submit" className="w-full" disabled={actionLoading}>
+                      <Button type="submit" className="w-full" disabled={actionLoading || !balanceForm.formState.isDirty}>
                           {actionLoading ? <Loader2 className="animate-spin" /> : "Save Balance"}
                       </Button>
                   </CardFooter>
@@ -433,7 +433,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                     )} />
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => setEditingInvestment(null)}>Cancel</Button>
-                        <Button type="submit" disabled={actionLoading}>
+                        <Button type="submit" disabled={actionLoading || !investmentForm.formState.isDirty}>
                             {actionLoading ? <Loader2 className="animate-spin" /> : "Save Changes"}
                         </Button>
                     </DialogFooter>
@@ -445,3 +445,5 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     </div>
   );
 }
+
+    
