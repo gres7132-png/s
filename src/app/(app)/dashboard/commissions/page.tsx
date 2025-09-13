@@ -22,7 +22,7 @@ import { Users, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, where } from "firebase/firestore";
 
 interface CommissionTier {
     id: string;
@@ -56,15 +56,30 @@ export default function AgentCommissionsPage() {
 
   useEffect(() => {
     if (user) {
-      // --- Backend Fetching Placeholder ---
-      const fetchReferralCount = async () => {
-        setLoading(true);
-        // const count = await getActiveReferralCount(user.uid);
-        // setUserActiveReferrals(count);
-        setUserActiveReferrals(0); // A new user starts with 0 referrals.
+      setLoading(true);
+      const referralsColRef = collection(db, "users", user.uid, "referrals");
+      
+      const unsubscribe = onSnapshot(referralsColRef, async (snapshot) => {
+        const referredUserIds = snapshot.docs.map(doc => doc.id);
+        let activeReferralCount = 0;
+
+        if (referredUserIds.length > 0) {
+            // Check each referred user for active investments
+            for (const referredUserId of referredUserIds) {
+                const investmentsColRef = collection(db, "users", referredUserId, "investments");
+                const activeInvestmentsQuery = query(investmentsColRef, where("status", "==", "active"));
+                const investmentsSnapshot = await getDocs(activeInvestmentsQuery);
+                if (!investmentsSnapshot.empty) {
+                    activeReferralCount++;
+                }
+            }
+        }
+        
+        setUserActiveReferrals(activeReferralCount);
         setLoading(false);
-      }
-      fetchReferralCount();
+      });
+
+      return () => unsubscribe();
     }
   }, [user]);
   
@@ -88,7 +103,7 @@ export default function AgentCommissionsPage() {
             <CardTitle>YOUR ACTIVE REFERRALS</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{loading ? "..." : userActiveReferrals}</p>
+            <p className="text-4xl font-bold">{loading ? <Loader2 className="animate-spin" /> : userActiveReferrals}</p>
           </CardContent>
         </Card>
         <Card>
@@ -96,7 +111,7 @@ export default function AgentCommissionsPage() {
             <CardTitle>YOUR CURRENT MONTHLY COMMISSION</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold text-primary">{loadingTiers ? "..." : formatCurrency(currentCommission)}</p>
+            <p className="text-4xl font-bold text-primary">{loadingTiers ? <Loader2 className="animate-spin" /> : formatCurrency(currentCommission)}</p>
           </CardContent>
         </Card>
       </div>

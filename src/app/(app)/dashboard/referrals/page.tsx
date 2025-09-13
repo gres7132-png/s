@@ -25,14 +25,14 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, getDocs, doc, getDoc } from "firebase/firestore";
 
 // This interface defines the structure for a referred user object.
 interface ReferredUser {
     id: string;
     name: string;
     capital: number;
-    commission: number;
+    commissionEarned: number; // Renamed for clarity
     status: 'Active' | 'Pending';
 }
 
@@ -43,51 +43,47 @@ export default function ReferralsPage() {
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchReferredUsers = useCallback(async (userId: string) => {
-    setLoading(true);
-    const referralsColRef = collection(db, "users", userId, "referrals");
-    const referralsQuery = query(referralsColRef);
-
-    const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
-      const users: ReferredUser[] = [];
-      for (const doc of snapshot.docs) {
-        const referredUserId = doc.id;
-        const referredUserData = doc.data();
-
-        // Now, get the total investment for this referred user
-        const investmentsColRef = collection(db, "users", referredUserId, "investments");
-        const investmentsSnapshot = await getDocs(investmentsColRef);
-        
-        let totalInvested = 0;
-        investmentsSnapshot.forEach(investmentDoc => {
-          totalInvested += investmentDoc.data().price || 0;
-        });
-
-        const commission = totalInvested * 0.05; // 5% commission
-        const status: 'Active' | 'Pending' = totalInvested > 0 ? 'Active' : 'Pending';
-
-        users.push({
-          id: referredUserId,
-          name: referredUserData.displayName,
-          capital: totalInvested,
-          commission: commission,
-          status: status,
-        });
-      }
-      setReferredUsers(users);
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
   useEffect(() => {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
-      const unsub = fetchReferredUsers(user.uid);
-      return () => { unsub.then(u => u()) };
+      
+      const referralsColRef = collection(db, "users", user.uid, "referrals");
+      
+      const unsubscribe = onSnapshot(referralsColRef, async (snapshot) => {
+        setLoading(true);
+        const usersPromises = snapshot.docs.map(async (refDoc) => {
+            const referredUserId = refDoc.id;
+            const referredUserData = refDoc.data();
+
+            // Get the total investment for this referred user
+            const investmentsColRef = collection(db, "users", referredUserId, "investments");
+            const investmentsSnapshot = await getDocs(investmentsColRef);
+            
+            let totalInvested = 0;
+            investmentsSnapshot.forEach(investmentDoc => {
+                totalInvested += investmentDoc.data().price || 0;
+            });
+
+            const commission = totalInvested * 0.05; // 5% commission
+            const status: 'Active' | 'Pending' = totalInvested > 0 ? 'Active' : 'Pending';
+
+            return {
+                id: referredUserId,
+                name: referredUserData.displayName,
+                capital: totalInvested,
+                commissionEarned: commission,
+                status: status,
+            };
+        });
+
+        const users = await Promise.all(usersPromises);
+        setReferredUsers(users);
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
     }
-  }, [user, fetchReferredUsers]);
+  }, [user]);
 
   const copyToClipboard = () => {
     if (!referralLink) return;
@@ -98,7 +94,8 @@ export default function ReferralsPage() {
     });
   };
 
-  const totalCommission = referredUsers.reduce((sum, u) => sum + u.commission, 0);
+  // This now represents the total commission you have already earned from these referrals
+  const totalCommission = referredUsers.reduce((sum, u) => sum + u.commissionEarned, 0);
 
   return (
     <div className="space-y-8">
@@ -133,7 +130,7 @@ export default function ReferralsPage() {
           <AlertTitle>Commission Structure</AlertTitle>
           <AlertDescription>
             <p className="mt-2">
-                You earn a <strong>5%</strong> commission on the total amount invested by users you directly refer. The more your referrals invest, the more you earn.
+                You earn a <strong>5%</strong> commission on the total amount invested by users you directly refer. The commission is automatically added to your available balance each time they make an investment.
             </p>
           </AlertDescription>
         </Alert>
@@ -144,11 +141,11 @@ export default function ReferralsPage() {
             <div>
               <CardTitle>Your Direct Referrals</CardTitle>
               <CardDescription>
-                Track the status of users you've personally referred.
+                Track the status of users you've personally referred and the commission you've earned.
               </CardDescription>
             </div>
             <div className="text-right">
-                <p className="text-sm text-muted-foreground">Commission Earned</p>
+                <p className="text-sm text-muted-foreground">Total Commission Earned</p>
                 <p className="text-2xl font-bold">{formatCurrency(totalCommission)}</p>
             </div>
           </div>
@@ -158,8 +155,8 @@ export default function ReferralsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>User Name</TableHead>
-                <TableHead>Invested Capital</TableHead>
-                <TableHead>Your Commission (5%)</TableHead>
+                <TableHead>Total Invested Capital</TableHead>
+                <TableHead>Your Total Commission (5%)</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -175,7 +172,7 @@ export default function ReferralsPage() {
                   <TableRow key={refUser.id}>
                     <TableCell className="font-medium">{refUser.name}</TableCell>
                     <TableCell>{formatCurrency(refUser.capital)}</TableCell>
-                    <TableCell>{formatCurrency(refUser.commission)}</TableCell>
+                    <TableCell>{formatCurrency(refUser.commissionEarned)}</TableCell>
                     <TableCell>
                       <Badge variant={refUser.status === 'Active' ? 'default' : 'secondary'}>
                         {refUser.status}

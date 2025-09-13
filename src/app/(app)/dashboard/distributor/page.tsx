@@ -36,7 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDocs, where } from "firebase/firestore";
 
 interface ContributorTier {
   id: string;
@@ -80,18 +80,47 @@ export default function DistributorPage() {
 
   useEffect(() => {
     if (user) {
+        setLoading(true);
         const userStatsRef = doc(db, "userStats", user.uid);
-        const unsubscribe = onSnapshot(userStatsRef, (doc) => {
-            if (doc.exists()) {
-                 setContributorData({
-                    userBalance: doc.data().availableBalance || 0,
-                    // In a real app, this would be a separate query.
-                    referredUsersCount: 0,
-                 });
-            }
-             setLoading(false);
+        const referralsColRef = collection(db, "users", user.uid, "referrals");
+
+        // Fetch balance
+        const unsubStats = onSnapshot(userStatsRef, (doc) => {
+            setContributorData(prev => ({
+                ...prev,
+                userBalance: doc.exists() ? doc.data().availableBalance || 0 : 0,
+                referredUsersCount: prev?.referredUsersCount || 0,
+            }));
         });
-        return () => unsubscribe();
+
+        // Fetch and count active referrals
+        const unsubReferrals = onSnapshot(referralsColRef, async (snapshot) => {
+            const referredUserIds = snapshot.docs.map(doc => doc.id);
+            let activeReferralCount = 0;
+
+            if (referredUserIds.length > 0) {
+                for (const referredUserId of referredUserIds) {
+                    const investmentsColRef = collection(db, "users", referredUserId, "investments");
+                    const activeInvestmentsQuery = query(investmentsColRef, where("status", "==", "active"));
+                    const investmentsSnapshot = await getDocs(activeInvestmentsQuery);
+                    if (!investmentsSnapshot.empty) {
+                        activeReferralCount++;
+                    }
+                }
+            }
+
+            setContributorData(prev => ({
+                ...prev,
+                userBalance: prev?.userBalance || 0,
+                referredUsersCount: activeReferralCount,
+            }));
+            setLoading(false);
+        });
+        
+        return () => {
+            unsubStats();
+            unsubReferrals();
+        };
     }
   }, [user]);
   
@@ -157,12 +186,14 @@ export default function DistributorPage() {
           </p>
         </div>
 
-        {!loading && !prerequisiteMet && (
+        {loading ? (
+           <Skeleton className="h-16 w-full" />
+        ) : !prerequisiteMet && (
           <Alert>
               <Users className="h-4 w-4" />
               <AlertTitle>Prerequisite Not Met</AlertTitle>
               <AlertDescription>
-                  You must refer at least two users who have made an investment before you can apply to become a contributor.
+                  You must refer at least two users who have made an investment before you can apply to become a contributor. You currently have {contributorData?.referredUsersCount} active referral(s).
               </AlertDescription>
           </Alert>
         )}

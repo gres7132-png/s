@@ -17,7 +17,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy, getDoc, writeBatch } from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { processReferral } from "@/ai/flows/user-management";
 
 interface InvestmentPackage {
   id: string;
@@ -114,6 +115,16 @@ export default function InvestPage() {
         });
       });
 
+      // 3. After successful transaction, process the referral commission in the background.
+      // This is done outside the transaction to avoid contention and because it can be eventual.
+      try {
+        await processReferral({ investorId: user.uid, investmentAmount: pkg.price });
+      } catch (referralError: any) {
+        // Log the error but don't fail the main investment toast.
+        // The user's investment was successful, which is the primary feedback they need.
+        console.error("Referral processing failed:", referralError.message);
+      }
+
       toast({
           title: "Investment Successful!",
           description: `You have invested in ${pkg.name}.`,
@@ -192,5 +203,3 @@ export default function InvestPage() {
     </div>
   );
 }
-
-    

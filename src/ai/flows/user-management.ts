@@ -3,13 +3,14 @@
 
 /**
  * @fileOverview User management flows for administrators.
- * IMPORTANT: This flow now contains the production-ready implementation for user management.
+ * IMPORTANT: This file now contains the production-ready implementation for user management.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 if (!getApps().length) {
   if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
@@ -47,6 +48,11 @@ export const UpdateUserStatusInputSchema = z.object({
 });
 export type UpdateUserStatusInput = z.infer<typeof UpdateUserStatusInputSchema>;
 
+export const ProcessReferralInputSchema = z.object({
+  investorId: z.string().describe("The UID of the user making the investment."),
+  investmentAmount: z.number().positive().describe("The amount of the investment."),
+});
+export type ProcessReferralInput = z.infer<typeof ProcessReferralInputSchema>;
 
 /**
  * Lists all users. This implementation uses the Firebase Admin SDK.
@@ -81,6 +87,62 @@ export async function updateUserStatus(input: UpdateUserStatusInput): Promise<{s
     await auth.updateUser(input.uid, { disabled: input.disabled });
     return { success: true };
 }
+
+/**
+ * Processes a referral commission when a new investment is made.
+ * @param {ProcessReferralInput} input The investor's UID and investment amount.
+ * @returns {Promise<{success: boolean, commissionAwarded: number}>} A success flag and the commission amount.
+ */
+export const processReferral = ai.defineFlow(
+  {
+    name: 'processReferralFlow',
+    inputSchema: ProcessReferralInputSchema,
+    outputSchema: z.object({ success: z.boolean(), commissionAwarded: z.number() }),
+  },
+  async ({ investorId, investmentAmount }) => {
+    if (!getApps().length) {
+      throw new Error("Admin SDK is not configured. Please check server environment variables.");
+    }
+    const db = getFirestore();
+    const investorDocRef = db.doc(`users/${investorId}`);
+    
+    const investorDoc = await investorDocRef.get();
+    if (!investorDoc.exists) {
+      console.log(`Investor ${investorId} not found. No referral to process.`);
+      return { success: true, commissionAwarded: 0 };
+    }
+    
+    const referrerId = investorDoc.data()?.referredBy;
+    if (!referrerId) {
+      console.log(`Investor ${investorId} was not referred by anyone.`);
+      return { success: true, commissionAwarded: 0 };
+    }
+    
+    const commissionRate = 0.05; // 5%
+    const commissionAmount = investmentAmount * commissionRate;
+    
+    const referrerStatsRef = db.doc(`userStats/${referrerId}`);
+    
+    try {
+      await referrerStatsRef.update({
+        availableBalance: FieldValue.increment(commissionAmount)
+      });
+      console.log(`Awarded ${commissionAmount} commission to referrer ${referrerId}.`);
+      return { success: true, commissionAwarded: commissionAmount };
+    } catch (error) {
+       console.error(`Failed to award commission to ${referrerId}:`, error);
+       // If the referrer's stats doc doesn't exist, create it.
+       const referrerStatsDoc = await referrerStatsRef.get();
+       if (!referrerStatsDoc.exists) {
+            await referrerStatsRef.set({ availableBalance: commissionAmount });
+            console.log(`Created stats doc and awarded ${commissionAmount} commission to referrer ${referrerId}.`);
+            return { success: true, commissionAwarded: commissionAmount };
+       }
+       // Re-throw if it's another error
+       throw error;
+    }
+  }
+);
 
 
 // Define the Genkit flows
