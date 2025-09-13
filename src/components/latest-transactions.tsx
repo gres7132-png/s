@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc, getDoc } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from "@/hooks/use-auth";
 
 interface Transaction {
     id: string;
@@ -29,6 +30,7 @@ interface UserDisplayInfo {
 }
 
 export default function LatestTransactions() {
+  const { user } = useAuth(); // We still need user to know when to start fetching
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [userCache, setUserCache] = useState<Record<string, UserDisplayInfo>>({});
   const [loading, setLoading] = useState(true);
@@ -53,16 +55,33 @@ export default function LatestTransactions() {
 
 
   useEffect(() => {
+    // Only start fetching once the user is authenticated, to ensure we have user context if needed,
+    // even though the queries are now global.
+    if (!user) return;
+
     setLoading(true);
     
-    const depositsQuery = query(collection(db, "transactionProofs"), orderBy("submittedAt", "desc"), limit(5));
-    const withdrawalsQuery = query(collection(db, "withdrawalRequests"), orderBy("requestedAt", "desc"), limit(5));
+    // CORRECTED: Queries now fetch the latest 5 transactions from the entire collection,
+    // not just for the current user.
+    const depositsQuery = query(
+        collection(db, "transactionProofs"), 
+        orderBy("submittedAt", "desc"), 
+        limit(5)
+    );
+    const withdrawalsQuery = query(
+        collection(db, "withdrawalRequests"), 
+        orderBy("requestedAt", "desc"), 
+        limit(5)
+    );
 
     const processSnapshot = (snapshot: any, type: 'Deposit' | 'Withdrawal') => {
         snapshot.docChanges().forEach((change: any) => {
-            if (change.type === "added") {
+            if (change.type === "added" || change.type === "modified") {
                 const data = change.doc.data();
                 if (data.userId) fetchUserDetails(data.userId);
+
+                // We only care about approved transactions for a live feed
+                if (data.status !== 'approved') return;
 
                 const newTx: Transaction = {
                     id: `${type.toLowerCase()}-${change.doc.id}`,
@@ -71,28 +90,40 @@ export default function LatestTransactions() {
                     amount: data.amount || 0,
                     timestamp: type === 'Deposit' ? data.submittedAt : data.requestedAt
                 };
-                 setTransactions(prev => [...prev, newTx].sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).slice(0, 5));
+                 // Add or update the transaction, then sort and slice.
+                 setTransactions(prev => {
+                    const filtered = prev.filter(tx => tx.id !== newTx.id);
+                    return [...filtered, newTx]
+                        .sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis())
+                        .slice(0, 5);
+                 });
             }
         });
         setLoading(false);
     };
 
-    const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => processSnapshot(snapshot, 'Deposit'));
-    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => processSnapshot(snapshot, 'Withdrawal'));
+    const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => processSnapshot(snapshot, 'Deposit'), (err) => {
+        console.error("Deposits subscription error:", err);
+        setLoading(false);
+    });
+    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => processSnapshot(snapshot, 'Withdrawal'), (err) => {
+        console.error("Withdrawals subscription error:", err);
+        setLoading(false);
+    });
     
     return () => {
         unsubDeposits();
         unsubWithdrawals();
     };
 
-  }, [fetchUserDetails]);
+  }, [user, fetchUserDetails]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Live Transactions</CardTitle>
         <CardDescription>
-          See the latest deposits and withdrawals happening on the platform.
+          See the latest approved deposits and withdrawals on the platform.
         </CardDescription>
       </CardHeader>
       <CardContent>
