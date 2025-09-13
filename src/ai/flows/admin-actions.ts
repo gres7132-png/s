@@ -44,6 +44,18 @@ async function verifyAdmin(flow: any) {
     }
 }
 
+// --- Helper to synchronize hasActiveInvestment flag ---
+async function syncHasActiveInvestment(db: FirebaseFirestore.Firestore, userId: string) {
+    const userRef = db.doc(`users/${userId}`);
+    const investmentsColRef = db.collection(`users/${userId}/investments`);
+    
+    const activeInvestmentsSnapshot = await investmentsColRef.where('status', '==', 'active').limit(1).get();
+    const hasActive = !activeInvestmentsSnapshot.empty;
+    
+    await userRef.update({ hasActiveInvestment: hasActive });
+    console.log(`User ${userId} hasActiveInvestment status set to ${hasActive}.`);
+}
+
 
 // --- Update User Balance ---
 export const UpdateBalanceInputSchema = z.object({
@@ -94,12 +106,18 @@ export const updateInvestment = ai.defineFlow(
   async (input, flow) => {
     await verifyAdmin(flow);
     const db = getFirestore();
+    
     const investmentRef = db.doc(`users/${input.userId}/investments/${input.investmentId}`);
+    
     await investmentRef.update({
       price: input.price,
       dailyReturn: input.dailyReturn,
       status: input.status,
     });
+    
+    // After updating, synchronize the user's active status.
+    await syncHasActiveInvestment(db, input.userId);
+    
     return { success: true };
   }
 );
@@ -123,7 +141,12 @@ export const deleteInvestment = ai.defineFlow(
     await verifyAdmin(flow);
     const db = getFirestore();
     const investmentRef = db.doc(`users/${input.userId}/investments/${input.investmentId}`);
+    
     await investmentRef.delete();
+    
+    // After deleting, synchronize the user's active status.
+    await syncHasActiveInvestment(db, input.userId);
+    
     return { success: true };
   }
 );
