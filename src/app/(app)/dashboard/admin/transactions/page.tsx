@@ -30,10 +30,10 @@ import {
   query,
   orderBy,
   doc,
-  updateDoc,
   Timestamp,
   runTransaction,
   getDoc,
+  FieldValue,
 } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from "@/lib/utils";
@@ -147,6 +147,7 @@ export default function TransactionsPage() {
 
             if (status === 'approved') {
                  if (type === 'withdrawal') {
+                    // **FIX:** Calculate service fee based on the *verifiedAmount*, not the original requested amount.
                     const serviceFee = verifiedAmount * WITHDRAWAL_FEE_RATE;
                     updateData.serviceFee = serviceFee;
                     updateData.amount = verifiedAmount;
@@ -175,20 +176,20 @@ export default function TransactionsPage() {
                     
                     if (type === 'deposit') {
                         newRecharge += verifiedAmount;
-                        transaction.set(userStatsDocRef, {
+                        transaction.update(userStatsDocRef, {
                             availableBalance: FieldValue.increment(verifiedAmount),
                             rechargeAmount: newRecharge,
-                        }, { merge: true });
+                        });
 
                     } else { // withdrawal
                          if (userStatsDoc.data()?.availableBalance < verifiedAmount) {
                             throw new Error("User has insufficient funds for this withdrawal.");
                         }
                         newWithdrawal += verifiedAmount;
-                         transaction.set(userStatsDocRef, {
+                         transaction.update(userStatsDocRef, {
                             availableBalance: FieldValue.increment(-verifiedAmount),
                             withdrawalAmount: newWithdrawal,
-                        }, { merge: true });
+                        });
                     }
                 } else if (type === 'withdrawal') {
                     // This should not happen if user can request withdrawal, but as a safeguard:
@@ -489,3 +490,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+    
