@@ -187,8 +187,7 @@ export default function ManageInvestmentsPage() {
                 </CardContent>
                 <CardFooter className="flex justify-between">
                   <Button type="submit" disabled={formLoading}>
-                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <PlusCircle />}
-                    {editingId ? "" : "Add Package"}
+                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <><PlusCircle /> Add Package</>}
                   </Button>
                   {editingId && (
                      <Button variant="ghost" onClick={resetForm} type="button">

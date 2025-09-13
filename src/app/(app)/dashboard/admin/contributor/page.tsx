@@ -182,8 +182,7 @@ export default function ManageContributorPage() {
                 </CardContent>
                 <CardFooter className="flex justify-between">
                   <Button type="submit" disabled={formLoading}>
-                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <PlusCircle />}
-                     {editingId ? "" : "Add Tier"}
+                    {formLoading ? <Loader2 className="animate-spin" /> : editingId ? "Save Changes" : <><PlusCircle /> Add Tier</>}
                   </Button>
                   {editingId && (
                      <Button variant="ghost" onClick={resetForm} type="button">
