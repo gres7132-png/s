@@ -49,7 +49,7 @@ export default function AdminPage() {
       icon: Briefcase,
     },
     { 
-      href: "/dashboard/admin/distributor", 
+      href: "/dashboard/admin/contributor", 
       title: "Contributor Tiers",
       description: "Manage contributor levels and deposits.",
       icon: Gift
@@ -109,4 +109,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
 

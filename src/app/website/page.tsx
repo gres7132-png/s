@@ -198,21 +198,21 @@ export default function WebstitePage() {
                         <div className="bg-primary/10 p-3 rounded-full"><Award className="h-6 w-6 text-primary" /></div>
                         <div>
                             <h4 className="font-semibold">Fixed Monthly Salary</h4>
-                            <p className="text-sm text-muted-foreground">Qualifying as a contributor grants you a fixed monthly income, separate from your investment returns and referral commissions, providing a reliable source of earnings.</p>
+                            <p className="text-sm text-muted-foreground">Qualifying as a contributor grants you a fixed monthly income, separate from your investment returns and referral commissions.</p>
                         </div>
                     </div>
                      <div className="flex items-start gap-4">
                         <div className="bg-primary/10 p-3 rounded-full"><Briefcase className="h-6 w-6 text-primary" /></div>
                         <div>
                             <h4 className="font-semibold">Deposit-Based Tiers</h4>
-                            <p className="text-sm text-muted-foreground">The program is structured in tiers (V1, V2, etc.). To join a tier, you must place a security deposit. Higher tiers require a larger deposit but offer a significantly higher monthly salary.</p>
+                            <p className="text-sm text-muted-foreground">To join a tier, you must place a security deposit. Higher tiers require a larger deposit but offer a significantly higher monthly salary.</p>
                         </div>
                     </div>
                      <div className="flex items-start gap-4">
                         <div className="bg-primary/10 p-3 rounded-full"><Users className="h-6 w-6 text-primary" /></div>
                         <div>
                             <h4 className="font-semibold">Prerequisites</h4>
-                            <p className="text-sm text-muted-foreground">This is an advanced program. To be eligible, you must first demonstrate your networking skills by referring a minimum number of active investors to the platform.</p>
+                            <p className="text-sm text-muted-foreground">To be eligible, you must first refer a minimum number of active investors to the platform.</p>
                         </div>
                     </div>
                 </div>
@@ -228,13 +228,13 @@ export default function WebstitePage() {
                  <div className="space-y-4 mb-12">
                      <h2 className="text-3xl font-bold tracking-tight">Agent Commission Program</h2>
                      <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                        Beyond the initial referral bonus, our Agent Program rewards you with a recurring monthly commission for building and maintaining a network of active investors.
+                        Our Agent Program rewards you with a recurring monthly commission for building and maintaining a network of active investors.
                      </p>
                  </div>
                  <div className="max-w-4xl mx-auto bg-muted/30 p-8 rounded-lg">
                     <h3 className="font-bold text-xl mb-4 text-primary">How It Works</h3>
                     <p className="text-muted-foreground">
-                        Your agent commission is determined by the number of your direct referrals who are 'active'—meaning they have at least one investment package running. At the end of each month, we count your active referrals and award you the monthly commission corresponding to the highest tier you have achieved. The more active members in your downline, the higher your recurring monthly paycheck.
+                       Your agent commission is determined by the number of your direct referrals who are 'active'—meaning they have at least one investment package running. At the end of each month, we count your active referrals and award you the monthly commission corresponding to the highest tier you have achieved.
                     </p>
                  </div>
                  <Button asChild size="lg" className="mt-12">
