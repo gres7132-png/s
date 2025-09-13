@@ -136,10 +136,11 @@ export function AuthForm() {
         withdrawalAmount: 0,
       });
       
-      // 3. If there's a referral code, set that in a subcollection
+      // 3. If there's a referral code, set that in the referrer's subcollection
       if (values.referralCode) {
         const referrerRef = doc(db, 'users', values.referralCode, 'referrals', newUser.uid);
-        batch.set(referrerRef, {
+        // This write is now separate and its permissions are handled by a different rule
+        await setDoc(referrerRef, {
             displayName: values.fullName,
             email: values.email,
             joinedAt: serverTimestamp(),
