@@ -3,78 +3,64 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is an admin
-    function isAdmin(request) {
-      // Keep this list in sync with your use-auth.tsx and admin-actions.ts
-      let ADMIN_EMAILS = ["gres7132@gmail.com"];
-      return request.auth != null && request.auth.token.email in ADMIN_EMAILS;
+    
+    // --- Admin Configuration ---
+    // This list must be kept in sync with the ADMIN_EMAILS array in the application code.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email in ["gres7132@gmail.com"];
     }
 
-    // --- User Data Rules ---
-    // Users can read their own data, and create it on signup.
-    // They can update their own displayName and bio.
+    // --- Publicly Readable Data ---
+    // Anyone can view the investment packages and tiers.
+    match /silverLevelPackages/{packageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /contributorTiers/{tierId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /commissionTiers/{tierId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- User Data ---
+    // Users can only read and write their own data.
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId && request.resource.data.keys().hasAll(['displayName', 'bio']);
+      allow read, update, create: if request.auth != null && request.auth.uid == userId;
+      // Allow admins to update the hasActiveInvestment flag
+      allow update: if isAdmin();
     }
-
-    // Users can read and update their own payment details.
-    match /userPaymentDetails/{userId} {
-      allow read, write: if request.auth.uid == userId;
-    }
-
-    // Users can read their own stats. Admins can update any user's stats.
     match /userStats/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow update: if isAdmin(request);
+       allow read, create: if request.auth != null && request.auth.uid == userId;
+       // Allow admins to update any user's stats (e.g., for balance changes)
+       allow update: if isAdmin();
+    }
+     match /userPaymentDetails/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- User-Specific Subcollections ---
+    // Users can manage their own investments.
+    match /users/{userId}/investments/{investmentId} {
+        allow read, create, update, delete: if request.auth != null && request.auth.uid == userId || isAdmin();
     }
     
-    // --- User-Specific Subcollections ---
-    match /users/{userId}/investments/{investmentId} {
-      // Users can create their own investments (by purchasing). They can read their own investments.
-      // Admins can perform any action on any user's investments.
-      allow read, create: if request.auth.uid == userId;
-      allow write: if isAdmin(request);
-    }
-
-    // --- Transaction Rules ---
-    // Users can create their own deposit proofs and withdrawal requests.
+    // --- Transaction & Request Submissions (User Actions) ---
+    // Any authenticated user can create a proof or a request.
+    // Only admins can update/delete them (approve/reject).
     match /transactionProofs/{proofId} {
-      allow create: if request.auth.uid == request.resource.data.userId;
-      // Admins can read or update any deposit proof.
-      allow read, update: if isAdmin(request);
+        allow create: if request.auth != null;
+        allow read, update, delete: if isAdmin();
     }
     match /withdrawalRequests/{requestId} {
-      allow create: if request.auth.uid == request.resource.data.userId;
-      // Admins can read or update any withdrawal request.
-      allow read, update: if isAdmin(request);
+        allow create: if request.auth != null;
+        allow read, update, delete: if isAdmin();
     }
-
-
-    // --- Global Read-Only Data ---
-    // Any authenticated user can read the packages and tiers.
-    match /silverLevelPackages/{packageId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin(request);
-    }
-
-    match /contributorTiers/{tierId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin(request);
-    }
-
-    match /commissionTiers/{tierId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin(request);
-    }
-    
-    // --- Application Rules (for contributors) ---
-    match /contributorApplications/{applicationId} {
-       allow create: if request.auth.uid == request.resource.data.userId;
-       // Admins can read or update any application.
-       allow read, update: if isAdmin(request);
+     match /contributorApplications/{applicationId} {
+        allow create: if request.auth != null;
+        allow read, update, delete: if isAdmin();
     }
   }
 }
