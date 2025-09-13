@@ -100,6 +100,10 @@ export default function ManageCommissionsPage() {
   };
 
   async function onSubmit(values: TierFormValues) {
+    if (!isAdmin) {
+        toast({ variant: "destructive", title: "Unauthorized", description: "You do not have permission to perform this action." });
+        return;
+    }
     setFormLoading(true);
     try {
       if (editingId) {
@@ -110,11 +114,12 @@ export default function ManageCommissionsPage() {
         toast({ title: "Tier Added", description: `Commission tier for ${values.referrals} referrals has been created.` });
       }
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error saving tier: ", error);
       toast({
         variant: "destructive",
         title: "Action Failed",
-        description: "Could not save the tier. Please try again.",
+        description: error.message || "Could not save the tier. Check Firestore rules.",
       });
     } finally {
       setFormLoading(false);
@@ -127,17 +132,22 @@ export default function ManageCommissionsPage() {
   };
 
   const handleDelete = async (tierId: string) => {
+     if (!isAdmin) {
+        toast({ variant: "destructive", title: "Unauthorized", description: "You do not have permission to perform this action." });
+        return;
+    }
     try {
         await deleteDoc(doc(db, "commissionTiers", tierId));
         toast({
             title: "Tier Deleted",
             description: "The commission tier has been removed.",
         });
-    } catch (error) {
+    } catch (error: any) {
+        console.error("Error deleting tier: ", error);
         toast({
             variant: "destructive",
             title: "Deletion Failed",
-            description: "Could not delete the tier. Please try again.",
+            description: error.message || "Could not delete the tier. Check Firestore rules.",
         });
     }
   };

@@ -106,6 +106,10 @@ export default function ManageInvestmentsPage() {
   };
 
   async function onSubmit(values: PackageFormValues) {
+    if (!isAdmin) {
+        toast({ variant: "destructive", title: "Unauthorized", description: "You do not have permission to perform this action." });
+        return;
+    }
     setFormLoading(true);
     try {
       if (editingId) {
@@ -116,11 +120,12 @@ export default function ManageInvestmentsPage() {
         toast({ title: "Package Added", description: `${values.name} has been successfully created.` });
       }
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
+       console.error("Error saving package: ", error);
       toast({
         variant: "destructive",
         title: "Action Failed",
-        description: "Could not save the package. Please try again.",
+        description: error.message || "Could not save the package. Check Firestore rules.",
       });
     } finally {
       setFormLoading(false);
@@ -133,17 +138,22 @@ export default function ManageInvestmentsPage() {
   };
 
   const handleDelete = async (packageId: string) => {
+    if (!isAdmin) {
+        toast({ variant: "destructive", title: "Unauthorized", description: "You do not have permission to perform this action." });
+        return;
+    }
     try {
         await deleteDoc(doc(db, "silverLevelPackages", packageId));
         toast({
             title: "Package Deleted",
             description: "The investment package has been removed.",
         });
-    } catch (error) {
+    } catch (error: any) {
+        console.error("Error deleting package: ", error);
         toast({
             variant: "destructive",
             title: "Deletion Failed",
-            description: "Could not delete the package. Please try again.",
+            description: error.message || "Could not delete the package. Check Firestore rules.",
         });
     }
   };

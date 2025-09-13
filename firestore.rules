@@ -1,113 +1,76 @@
 
 rules_version = '2';
 
-// --- Admin Configuration ---
-// This list MUST be kept in sync with the ADMIN_EMAILS array in src/hooks/use-auth.tsx
-function getAdminEmails() {
-  return ["gres7132@gmail.com"];
-}
-
-// --- Helper Functions ---
-function isAuthenticated() {
-  return request.auth != null;
-}
-
-function isOwner(userId) {
-  return request.auth.uid == userId;
-}
-
-// Checks if the requesting user's email is in the admin list.
-function isAdmin() {
-  return isAuthenticated() && request.auth.token.email in getAdminEmails();
-}
-
-// This function checks that only a specific set of non-sensitive fields are being accessed.
-// Used to allow the public "Live Transactions" feed to work without exposing user data.
-function isPublicTransactionRead() {
-  return isAuthenticated() 
-      && resource.data.keys().hasOnly(['userName', 'amount', 'timestamp', 'type', 'submittedAt', 'requestedAt']);
-}
-
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // --- User Data ---
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId);
-    }
-    
-    // --- User-Specific Subcollections (investments, referrals) ---
-    match /users/{userId}/{collectionId}/{docId} {
-       allow read, write: if isOwner(userId);
-       allow read: if isAdmin();
-    }
-    
-    // --- User Stats ---
-    match /userStats/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      // Only admin can update balances during transaction approvals.
-      // User balances are updated via secure backend transactions.
-      allow write: if isAdmin();
-    }
-    
-    // --- User Payment Details ---
-    match /userPaymentDetails/{userId} {
-       // User can read and write their own details. Admin can only read.
-       allow read: if isOwner(userId) || isAdmin();
-       allow write: if isOwner(userId);
+
+    // Helper function to check if a user is an authenticated admin
+    function isAdmin() {
+      // Keep this list in sync with use-auth.tsx and admin-actions.ts
+      let ADMIN_EMAILS = ["gres7132@gmail.com"];
+      return request.auth != null && request.auth.token.email in ADMIN_EMAILS;
     }
 
-    // --- Investment Packages (Admin Writable) ---
-    match /silverLevelPackages/{packageId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    // --- Distributor Tiers (Admin Writable) ---
-    match /distributorTiers/{tierId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-    
-    // --- Commission Tiers (Admin Writable) ---
+    // Publicly readable collections (tiers, packages)
     match /commissionTiers/{tierId} {
-        allow read: if isAuthenticated();
-        allow write: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin(); // Only admins can create, update, delete
+    }
+    match /contributorTiers/{tierId} {
+      allow read: if true;
+      allow write: if isAdmin(); // Only admins can create, update, delete
+    }
+    match /silverLevelPackages/{packageId} {
+      allow read: if true;
+      allow write: if isAdmin(); // Only admins can create, update, delete
     }
 
-    // --- Transaction Proofs (Deposits) ---
-    match /transactionProofs/{proofId} {
-        // Admins can read anything. Users can read their own. Public feed can list.
-        allow list: if isAuthenticated();
-        allow read: if isAdmin() || isOwner(request.resource.data.userId);
-        allow create: if isAuthenticated();
-        allow update: if isAdmin();
-    }
-    
-    // --- Withdrawal Requests ---
-    match /withdrawalRequests/{reqId} {
-        // Admins can read anything. Users can read their own. Public feed can list.
-        allow list: if isAuthenticated();
-        allow read: if isAdmin() || isOwner(request.resource.data.userId);
-        allow create: if isAuthenticated();
-        allow update: if isAdmin();
-    }
-    
-    // --- Commission Applications (User can apply, Admin can manage) ---
-    match /commissionApplications/{appId} {
-        allow read: if isAdmin() || isOwner(request.resource.data.userId);
-        allow create: if isAuthenticated();
-        allow update: if isAdmin();
-    }
-
-    // --- Distributor Purchases (Log for Admin) ---
-    match /distributorPurchases/{purchaseId} {
-        allow read: if isAdmin();
-        // Writes are handled by secure backend transactions, so no direct client write rule is needed.
+    // User-specific data
+    match /users/{userId} {
+      // A user can read/write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admins can also read user documents
+      allow get: if isAdmin();
+      // Admins can update a user's `hasActiveInvestment` status
+      allow update: if isAdmin() && request.resource.data.keys().hasOnly(['hasActiveInvestment']);
+      
+      // Investments are subcollections of users
+      match /investments/{investmentId} {
+        // A user can read their own investments
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // Investments can only be created/deleted via backend flows, so no direct client write access
         allow write: if false; 
+      }
     }
+    
+    // User stats can be read by the owner, and read/written by admins via flows
+    match /userStats/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // All writes should happen via secure backend flows
+      allow write: if false;
+    }
+
+    // Transaction proofs can be created by any authenticated user
+    match /transactionProofs/{proofId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Only readable by admins (via backend flows)
+      allow read, update, delete: if false;
+    }
+
+    // Withdrawal requests can only be created by the user via a backend flow
+    match /withdrawalRequests/{reqId} {
+      allow read, write: if false;
+    }
+    
+    // Contributor applications can only be created by the user via a backend flow
+    match /contributorApplications/{appId} {
+      allow read, write: if false;
+    }
+    
+    // User payment details can be read/written by the owner
+    match /userPaymentDetails/{userId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
   }
 }
-
-    
