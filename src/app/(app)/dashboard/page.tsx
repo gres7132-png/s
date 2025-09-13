@@ -115,14 +115,17 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-xs text-muted-foreground">
-            <p>
-              1: You can withdraw your earnings from purchased products at any time. Withdrawals are processed by our team and may take 3-5 business days.
+             <p>
+              1: The company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
             </p>
             <p>
-              2: To ensure the sustainability of the platform, a 15% service fee is applied to all withdrawals to cover transaction and operational costs.
+              2: You can withdraw your earnings from purchased products at any time. Withdrawals are processed by our team and may take 3-5 business days.
             </p>
             <p>
-              3: You only need to have one account in the company, and multiple accounts are not allowed. The system will automatically block members with multiple accounts.
+              3: To ensure the sustainability of the platform, a 15% service fee is applied to all withdrawals to cover transaction and operational costs. This fee is waived on the 23rd of each month.
+            </p>
+            <p>
+              4: You only need to have one account in the company, and multiple accounts are not allowed. The system will automatically block members with multiple accounts.
             </p>
           </CardContent>
         </Card>

@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TAX_FREE_DAY } from "@/lib/config";
 
 interface UserDisplayInfo {
     displayName?: string;
@@ -137,6 +138,7 @@ export default function TransactionsPage() {
     setUpdatingId(id);
     const collectionName = type === 'deposit' ? "transactionProofs" : "withdrawalRequests";
     const WITHDRAWAL_FEE_RATE = 0.15;
+    const isTaxFreeDay = new Date().getDate() === TAX_FREE_DAY;
     
     try {
         await runTransaction(db, async (transaction) => {
@@ -148,7 +150,7 @@ export default function TransactionsPage() {
             if (status === 'approved') {
                  if (type === 'withdrawal') {
                     // **FIX:** Calculate service fee based on the *verifiedAmount*, not the original requested amount.
-                    const serviceFee = verifiedAmount * WITHDRAWAL_FEE_RATE;
+                    const serviceFee = isTaxFreeDay ? 0 : verifiedAmount * WITHDRAWAL_FEE_RATE;
                     updateData.serviceFee = serviceFee;
                     updateData.amount = verifiedAmount;
                 } else {
@@ -185,9 +187,10 @@ export default function TransactionsPage() {
                          if (userStatsDoc.data()?.availableBalance < verifiedAmount) {
                             throw new Error("User has insufficient funds for this withdrawal.");
                         }
-                        newWithdrawal += verifiedAmount;
+                        const amountToDeduct = verifiedAmount; // The service fee is just for record-keeping, the full requested amount is deducted.
+                        newWithdrawal += amountToDeduct;
                          transaction.update(userStatsDocRef, {
-                            availableBalance: FieldValue.increment(-verifiedAmount),
+                            availableBalance: FieldValue.increment(-amountToDeduct),
                             withdrawalAmount: newWithdrawal,
                         });
                     }
@@ -200,7 +203,7 @@ export default function TransactionsPage() {
 
         toast({
             title: "Status Updated",
-            description: `Transaction has been ${status}.`,
+            description: `Transaction has been ${status}. ${isTaxFreeDay && type === 'withdrawal' && status === 'approved' ? 'No service fee was charged.' : ''}`,
         });
 
     } catch (error: any) {
@@ -419,7 +422,7 @@ export default function TransactionsPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Withdrawal Requests</CardTitle>
-                    <CardDescription>Approve to deduct funds and apply a 15% tax. You must then manually send the final amount to the user's saved payment details.</CardDescription>
+                    <CardDescription>Approve to deduct funds. The 15% service fee will be waived automatically if today is the 23rd of the month. You must manually send the final amount to the user.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
@@ -490,5 +493,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    

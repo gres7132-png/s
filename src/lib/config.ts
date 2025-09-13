@@ -31,10 +31,14 @@ export const paymentDetails = {
 export const silverLevelPackages = [];
 
 // --- Golden Level Contributor Tiers ---
-// This data is now managed in Firestore. See src/app/(app)/dashboard/admin/distributor/page.tsx
+// This data is now managed in Firestore. See src/app/(app)/dashboard/admin/contributor/page.tsx
 export const distributorTiers = [];
 
 // --- Agent Commission Tiers ---
 // This data is now managed in Firestore. See src/app/(app)/dashboard/admin/commissions/page.tsx
 export const commissionTiers = [];
 
+// --- Tax-Free Day Rule ---
+// The company will set a tax-free day for all members on the 23rd of each month. 
+// No fees will be deducted on this day.
+export const TAX_FREE_DAY = 23;

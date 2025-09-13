@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -378,7 +377,7 @@ export default function WalletPage() {
             <CardHeader>
               <CardTitle>Request Withdrawal</CardTitle>
               <CardDescription>
-                A 15% service fee is applied to all withdrawals. Processing may take 3-5 business days.
+                A 15% service fee is applied to all withdrawals, except on the 23rd of each month. Processing may take 3-5 business days.
               </CardDescription>
             </CardHeader>
             <CardContent>
