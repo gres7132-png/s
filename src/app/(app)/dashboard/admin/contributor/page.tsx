@@ -81,7 +81,7 @@ export default function ManageContributorPage() {
   useEffect(() => {
     if (!isAdmin) return;
 
-    const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
+    const q = query(collection(db, "contributorTiers"), orderBy("deposit"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedTiers: ContributorTier[] = [];
         querySnapshot.forEach((doc) => {
@@ -107,10 +107,10 @@ export default function ManageContributorPage() {
     setFormLoading(true);
     try {
       if (editingId) {
-        await setDoc(doc(db, "distributorTiers", editingId), values);
+        await setDoc(doc(db, "contributorTiers", editingId), values);
         toast({ title: "Tier Updated", description: `Contributor level ${values.level} has been updated.` });
       } else {
-        await addDoc(collection(db, "distributorTiers"), values);
+        await addDoc(collection(db, "contributorTiers"), values);
         toast({ title: "Tier Added", description: `Contributor level ${values.level} has been created.` });
       }
       resetForm();
@@ -132,7 +132,7 @@ export default function ManageContributorPage() {
 
   const handleDelete = async (tierId: string) => {
     try {
-        await deleteDoc(doc(db, "distributorTiers", tierId));
+        await deleteDoc(doc(db, "contributorTiers", tierId));
         toast({
             title: "Tier Deleted",
             description: "The contributor tier has been removed.",

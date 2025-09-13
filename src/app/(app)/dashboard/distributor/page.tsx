@@ -54,7 +54,7 @@ interface ContributorData {
 export default function DistributorPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [distributorTiers, setDistributorTiers] = useState<ContributorTier[]>([]);
+  const [contributorTiers, setContributorTiers] = useState<ContributorTier[]>([]);
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
   const [selectedTier, setSelectedTier] = useState<ContributorTier | null>(null);
@@ -62,13 +62,13 @@ export default function DistributorPage() {
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
+    const q = query(collection(db, "contributorTiers"), orderBy("deposit"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedTiers: ContributorTier[] = [];
         querySnapshot.forEach((doc) => {
             fetchedTiers.push({ id: doc.id, ...doc.data() } as ContributorTier);
         });
-        setDistributorTiers(fetchedTiers);
+        setContributorTiers(fetchedTiers);
         setLoadingTiers(false);
     }, (error) => {
         console.error("Error fetching tiers:", error);
@@ -207,7 +207,7 @@ export default function DistributorPage() {
               <TableBody>
                 {loadingTiers ? (
                     <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin"/></TableCell></TableRow>
-                ) : distributorTiers.map((tier) => (
+                ) : contributorTiers.map((tier) => (
                   <TableRow key={tier.level}>
                     <TableCell className="font-medium">
                       <Badge variant="secondary">{tier.level}</Badge>
