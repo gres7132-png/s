@@ -38,7 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 
-interface DistributorTier {
+interface ContributorTier {
   id: string;
   level: string;
   monthlyIncome: number;
@@ -46,7 +46,7 @@ interface DistributorTier {
   deposit: number;
 }
 
-interface DistributorData {
+interface ContributorData {
     referredUsersCount: number;
     userBalance: number;
 }
@@ -54,19 +54,19 @@ interface DistributorData {
 export default function DistributorPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [distributorTiers, setDistributorTiers] = useState<DistributorTier[]>([]);
+  const [distributorTiers, setDistributorTiers] = useState<ContributorTier[]>([]);
   const [loadingTiers, setLoadingTiers] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<DistributorTier | null>(null);
-  const [distributorData, setDistributorData] = useState<DistributorData | null>(null);
+  const [selectedTier, setSelectedTier] = useState<ContributorTier | null>(null);
+  const [contributorData, setContributorData] = useState<ContributorData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedTiers: DistributorTier[] = [];
+        const fetchedTiers: ContributorTier[] = [];
         querySnapshot.forEach((doc) => {
-            fetchedTiers.push({ id: doc.id, ...doc.data() } as DistributorTier);
+            fetchedTiers.push({ id: doc.id, ...doc.data() } as ContributorTier);
         });
         setDistributorTiers(fetchedTiers);
         setLoadingTiers(false);
@@ -83,7 +83,7 @@ export default function DistributorPage() {
         const userStatsRef = doc(db, "userStats", user.uid);
         const unsubscribe = onSnapshot(userStatsRef, (doc) => {
             if (doc.exists()) {
-                 setDistributorData({
+                 setContributorData({
                     userBalance: doc.data().availableBalance || 0,
                     // In a real app, this would be a separate query.
                     referredUsersCount: 0,
@@ -95,8 +95,8 @@ export default function DistributorPage() {
     }
   }, [user]);
   
-  const handleApplyClick = (tier: DistributorTier) => {
-    if (!distributorData || distributorData.userBalance < tier.deposit) {
+  const handleApplyClick = (tier: ContributorTier) => {
+    if (!contributorData || contributorData.userBalance < tier.deposit) {
       toast({
         variant: "destructive",
         title: "Insufficient Funds",
@@ -116,18 +116,18 @@ export default function DistributorPage() {
         // --- Backend Logic Placeholder ---
         // Here you would call a backend function to:
         // 1. Deduct the deposit from the user's balance.
-        // 2. Mark the user as having applied for the distributor level.
+        // 2. Mark the user as having applied for the contributor level.
         // e.g., await applyForDistributor(user.uid, selectedTier.level);
         console.log(`Processing application for ${selectedTier.level}...`);
         
 
         toast({
           title: "Application Successful!",
-          description: `You have applied for the ${selectedTier.level} distributor level. Your application is now pending approval.`,
+          description: `You have applied for the ${selectedTier.level} contributor level. Your application is now pending approval.`,
         });
 
         // Optimistically update the UI or refetch data
-        setDistributorData(prev => prev ? {...prev, userBalance: prev.userBalance - selectedTier.deposit} : null);
+        setContributorData(prev => prev ? {...prev, userBalance: prev.userBalance - selectedTier.deposit} : null);
 
     } catch (error) {
         toast({
@@ -145,15 +145,15 @@ export default function DistributorPage() {
     setSelectedTier(null);
   };
 
-  const prerequisiteMet = (distributorData?.referredUsersCount ?? 0) >= 2;
+  const prerequisiteMet = (contributorData?.referredUsersCount ?? 0) >= 2;
 
   return (
     <>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Golden Level Distributor Program</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Golden Level Contributor Program</h1>
           <p className="text-muted-foreground">
-            Apply to become a Golden Level distributor for monthly income opportunities.
+            Apply to become a Golden Level contributor for monthly income opportunities.
           </p>
         </div>
 
@@ -162,7 +162,7 @@ export default function DistributorPage() {
               <Users className="h-4 w-4" />
               <AlertTitle>Prerequisite Not Met</AlertTitle>
               <AlertDescription>
-                  You must refer at least two users who have made an investment before you can apply to become a distributor.
+                  You must refer at least two users who have made an investment before you can apply to become a contributor.
               </AlertDescription>
           </Alert>
         )}
@@ -171,7 +171,7 @@ export default function DistributorPage() {
           <CardHeader>
             <CardTitle>Golden Level Tiers</CardTitle>
             <CardDescription>
-              Select a distributor level to apply for. A deposit is required and your application is subject to approval.
+              Select a contributor level to apply for. A deposit is required and your application is subject to approval.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -220,7 +220,7 @@ export default function DistributorPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm Application</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to apply for the <span className="font-bold">{selectedTier.level}</span> distributor level? The deposit of <span className="font-bold">{formatCurrency(selectedTier.deposit)}</span> will be deducted from your available balance. This action cannot be undone.
+                  Are you sure you want to apply for the <span className="font-bold">{selectedTier.level}</span> contributor level? The deposit of <span className="font-bold">{formatCurrency(selectedTier.deposit)}</span> will be deducted from your available balance. This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

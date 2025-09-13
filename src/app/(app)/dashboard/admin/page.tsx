@@ -50,8 +50,8 @@ export default function AdminPage() {
     },
     { 
       href: "/dashboard/admin/distributor", 
-      title: "Distributor Tiers",
-      description: "Manage distributor levels and deposits.",
+      title: "Contributor Tiers",
+      description: "Manage contributor levels and deposits.",
       icon: Gift
     },
     {

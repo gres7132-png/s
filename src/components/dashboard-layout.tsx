@@ -57,7 +57,7 @@ const navItems = [
   { href: "/dashboard/wallet", icon: Wallet, label: "Withdraw/Deposit" },
   { href: "/dashboard/yield-projections", icon: TrendingUp, label: "Yield Projections"},
   { href: "/dashboard/referrals", icon: UserPlus, label: "Referral Program" },
-  { href: "/dashboard/distributor", icon: Gift, label: "Distributor Program" },
+  { href: "/dashboard/distributor", icon: Gift, label: "Contributor Program" },
   { href: "/dashboard/commissions", icon: DollarSign, label: "Agent Commissions" },
 ];
 

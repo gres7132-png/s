@@ -30,7 +30,7 @@ export const paymentDetails = {
 // This data is now managed in Firestore. See src/app/(app)/dashboard/admin/investments/page.tsx
 export const silverLevelPackages = [];
 
-// --- Golden Level Distributor Tiers ---
+// --- Golden Level Contributor Tiers ---
 // This data is now managed in Firestore. See src/app/(app)/dashboard/admin/distributor/page.tsx
 export const distributorTiers = [];
 

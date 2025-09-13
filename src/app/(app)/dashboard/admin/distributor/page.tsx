@@ -58,12 +58,12 @@ const tierSchema = z.object({
 });
 
 type TierFormValues = z.infer<typeof tierSchema>;
-type DistributorTier = TierFormValues & { id: string };
+type ContributorTier = TierFormValues & { id: string };
 
 export default function ManageDistributorPage() {
   const { toast } = useToast();
   const { isAdmin } = useAuth();
-  const [tiers, setTiers] = useState<DistributorTier[]>([]);
+  const [tiers, setTiers] = useState<ContributorTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
 
@@ -82,15 +82,15 @@ export default function ManageDistributorPage() {
 
     const q = query(collection(db, "distributorTiers"), orderBy("deposit"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedTiers: DistributorTier[] = [];
+        const fetchedTiers: ContributorTier[] = [];
         querySnapshot.forEach((doc) => {
-            fetchedTiers.push({ id: doc.id, ...doc.data() } as DistributorTier);
+            fetchedTiers.push({ id: doc.id, ...doc.data() } as ContributorTier);
         });
         setTiers(fetchedTiers);
         setLoading(false);
     }, (error) => {
         console.error("Error fetching tiers:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not fetch distributor tiers." });
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch contributor tiers." });
         setLoading(false);
     });
 
@@ -104,7 +104,7 @@ export default function ManageDistributorPage() {
       form.reset({ level: "", monthlyIncome: 0, purchasedProducts: 0, deposit: 0 });
       toast({
         title: "Tier Added",
-        description: `Distributor level ${values.level} has been successfully created.`,
+        description: `Contributor level ${values.level} has been successfully created.`,
       });
     } catch (error) {
       toast({
@@ -122,7 +122,7 @@ export default function ManageDistributorPage() {
         await deleteDoc(doc(db, "distributorTiers", tierId));
         toast({
             title: "Tier Deleted",
-            description: "The distributor tier has been removed.",
+            description: "The contributor tier has been removed.",
         });
     } catch (error) {
         toast({
@@ -136,9 +136,9 @@ export default function ManageDistributorPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Manage Distributor Tiers</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Manage Contributor Tiers</h1>
         <p className="text-muted-foreground">
-          Add, edit, or remove Golden Level distributor tiers.
+          Add, edit, or remove Golden Level contributor tiers.
         </p>
       </div>
 
@@ -150,7 +150,7 @@ export default function ManageDistributorPage() {
                 <CardHeader>
                   <CardTitle>Add New Tier</CardTitle>
                   <CardDescription>
-                    Fill out the details for the new distributor level.
+                    Fill out the details for the new contributor level.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -182,7 +182,7 @@ export default function ManageDistributorPage() {
                 <CardHeader>
                     <CardTitle>Existing Tiers</CardTitle>
                     <CardDescription>
-                        This is the list of distributor levels currently available to users.
+                        This is the list of contributor levels currently available to users.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -232,7 +232,7 @@ export default function ManageDistributorPage() {
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center text-muted-foreground">
-                                        No distributor tiers found. Add one using the form.
+                                        No contributor tiers found. Add one using the form.
                                     </TableCell>
                                 </TableRow>
                             )}
