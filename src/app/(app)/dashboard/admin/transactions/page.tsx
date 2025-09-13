@@ -116,14 +116,21 @@ export default function TransactionsPage() {
         await runTransaction(db, async (transaction) => {
             const transactionDocRef = doc(db, collectionName, id);
             const userStatsDocRef = doc(db, "userStats", userId);
+            
+            let updateData: any = { status };
+
+            if (status === 'approved') {
+                 if (type === 'withdrawal') {
+                    const serviceFee = verifiedAmount * WITHDRAWAL_FEE_RATE;
+                    updateData.serviceFee = serviceFee;
+                    updateData.amount = verifiedAmount;
+                } else {
+                    updateData.amount = verifiedAmount;
+                }
+            }
 
             // 1. Update the transaction status
-            if (type === 'withdrawal' && status === 'approved') {
-                const serviceFee = verifiedAmount * WITHDRAWAL_FEE_RATE;
-                transaction.update(transactionDocRef, { status, serviceFee, amount: verifiedAmount });
-            } else {
-                 transaction.update(transactionDocRef, { status, amount: status === 'approved' ? verifiedAmount : undefined });
-            }
+            transaction.update(transactionDocRef, updateData);
 
             // 2. If approved, update the user's balance
             if (status === 'approved') {
@@ -447,3 +454,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
