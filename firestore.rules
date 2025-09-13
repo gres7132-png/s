@@ -12,7 +12,7 @@ function isAuthenticated() {
 }
 
 function isOwner(userId) {
-  return isAuthenticated() && request.auth.uid == userId;
+  return request.auth.uid == userId;
 }
 
 function isAdmin() {
@@ -22,27 +22,22 @@ function isAdmin() {
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // --- User-Specific Data ---
-    // Users can manage their own data. Admins can manage all user data.
+    // --- User Data & Subcollections ---
     match /users/{userId}/{path=**} {
-      allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write: if isAdmin() || isOwner(userId);
     }
-
+    
     // --- User Stats ---
-    // Users can read their own stats. Admins can read/write all stats.
     match /userStats/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isAdmin();
-      allow create: if isOwner(userId) || isAdmin(); // Allow admin to create if missing
+      allow read, write: if isAdmin() || isOwner(userId);
     }
     
     // --- User Payment Details ---
-    // Users can manage their own payment details. Admins can manage all.
     match /userPaymentDetails/{userId} {
-       allow read, write: if isOwner(userId) || isAdmin();
+       allow read, write: if isAdmin() || isOwner(userId);
     }
 
-    // --- Publicly Readable, Admin-Writable Collections ---
+    // --- Investment & Tier Packages (Admin Writable, User Readable) ---
     match /silverLevelPackages/{packageId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
@@ -57,27 +52,18 @@ service cloud.firestore {
     }
 
     // --- Transaction & Application Collections ---
-    // Users can create their own requests. They can only read their own.
-    // Admins have full read/write access to all requests.
+    // Users can create their own requests/proofs. Admins have full control.
     match /transactionProofs/{proofId} {
         allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin() || (isOwner(request.resource.data.userId));
+        allow read, update, delete: if isAdmin() || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
     }
     match /withdrawalRequests/{reqId} {
         allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin() || (isOwner(request.resource.data.userId));
+        allow read, update, delete: if isAdmin() || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
     }
-     match /contributorApplications/{appId} {
+    match /contributorApplications/{appId} {
         allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin() || (isOwner(request.resource.data.userId));
-    }
-
-    // --- Definitive Admin Super-User Rule ---
-    // This is a catch-all rule that grants admins full access to any document.
-    // This ensures an admin is never blocked from managing any part of the database.
-    // It is placed last to be evaluated after more specific rules.
-    match /{path=**}/{document} {
-      allow read, write: if isAdmin();
+        allow read, update, delete: if isAdmin() || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
     }
   }
 }
