@@ -33,6 +33,7 @@ import {
   updateDoc,
   Timestamp,
   runTransaction,
+  getDoc,
 } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from "@/lib/utils";
@@ -56,10 +57,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface UserDisplayInfo {
+    displayName?: string;
+    email?: string;
+}
+
 interface TransactionProof {
   id: string;
   userId: string;
-  userName:string;
   proof: string;
   amount: number;
   submittedAt: Timestamp;
@@ -77,7 +82,6 @@ interface PaymentDetails {
 interface WithdrawalRequest {
   id: string;
   userId: string;
-  userName: string;
   amount: number;
   requestedAt: Timestamp;
   status: 'pending' | 'approved' | 'rejected';
@@ -93,12 +97,34 @@ export default function TransactionsPage() {
   
   const [proofs, setProofs] = useState<TransactionProof[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [userCache, setUserCache] = useState<Record<string, UserDisplayInfo>>({});
   
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const [approvalItem, setApprovalItem] = useState<TransactionItem | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<number>(0);
+
+  const fetchUserDetails = useCallback(async (userId: string) => {
+    if (userCache[userId]) {
+        return userCache[userId];
+    }
+    try {
+        const userDocRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+            const userData = {
+                displayName: userDoc.data().displayName,
+                email: userDoc.data().email,
+            };
+            setUserCache(prev => ({...prev, [userId]: userData}));
+            return userData;
+        }
+    } catch (error) {
+        console.error("Failed to fetch user details for cache:", error);
+    }
+    return { displayName: 'Unknown User', email: '' };
+  }, [userCache]);
   
 
   const handleUpdateStatus = useCallback(async (
@@ -144,27 +170,26 @@ export default function TransactionsPage() {
                         todaysEarnings: 0,
                      });
                 } else if (userStatsDoc.exists()) {
-                    const currentStats = userStatsDoc.data();
-                    let newBalance = currentStats.availableBalance;
-                    let newRecharge = currentStats.rechargeAmount || 0;
-                    let newWithdrawal = currentStats.withdrawalAmount || 0;
-
+                    let newRecharge = userStatsDoc.data()?.rechargeAmount || 0;
+                    let newWithdrawal = userStatsDoc.data()?.withdrawalAmount || 0;
+                    
                     if (type === 'deposit') {
-                        newBalance += verifiedAmount;
                         newRecharge += verifiedAmount;
+                        transaction.set(userStatsDocRef, {
+                            availableBalance: FieldValue.increment(verifiedAmount),
+                            rechargeAmount: newRecharge,
+                        }, { merge: true });
+
                     } else { // withdrawal
-                        if (newBalance < verifiedAmount) {
+                         if (userStatsDoc.data()?.availableBalance < verifiedAmount) {
                             throw new Error("User has insufficient funds for this withdrawal.");
                         }
-                        newBalance -= verifiedAmount;
                         newWithdrawal += verifiedAmount;
+                         transaction.set(userStatsDocRef, {
+                            availableBalance: FieldValue.increment(-verifiedAmount),
+                            withdrawalAmount: newWithdrawal,
+                        }, { merge: true });
                     }
-                    
-                    transaction.update(userStatsDocRef, { 
-                        availableBalance: newBalance,
-                        rechargeAmount: newRecharge,
-                        withdrawalAmount: newWithdrawal,
-                    });
                 } else if (type === 'withdrawal') {
                     // This should not happen if user can request withdrawal, but as a safeguard:
                     throw new Error("Cannot process withdrawal for a user with no stats record.");
@@ -202,7 +227,12 @@ export default function TransactionsPage() {
 
     const depositsQuery = query(collection(db, "transactionProofs"), orderBy("submittedAt", "desc"));
     const unsubscribeDeposits = onSnapshot(depositsQuery, (snapshot) => {
-      const fetchedProofs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransactionProof));
+      const fetchedProofs: TransactionProof[] = [];
+      snapshot.forEach(doc => {
+          const data = doc.data() as Omit<TransactionProof, 'id'>;
+          fetchedProofs.push({ id: doc.id, ...data });
+          if(data.userId) fetchUserDetails(data.userId);
+      });
       setProofs(fetchedProofs);
       setLoading(false);
     }, (error) => {
@@ -213,7 +243,12 @@ export default function TransactionsPage() {
 
     const withdrawalsQuery = query(collection(db, "withdrawalRequests"), orderBy("requestedAt", "desc"));
     const unsubscribeWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => {
-      const fetchedWithdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest));
+      const fetchedWithdrawals: WithdrawalRequest[] = [];
+      snapshot.forEach(doc => {
+          const data = doc.data() as Omit<WithdrawalRequest, 'id'>;
+          fetchedWithdrawals.push({ id: doc.id, ...data });
+          if(data.userId) fetchUserDetails(data.userId);
+      });
       setWithdrawals(fetchedWithdrawals);
       setLoading(false);
     }, (error) => {
@@ -226,7 +261,7 @@ export default function TransactionsPage() {
       unsubscribeDeposits();
       unsubscribeWithdrawals();
     };
-  }, [isAdmin, toast]);
+  }, [isAdmin, toast, fetchUserDetails]);
 
   if (authLoading) {
     return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -363,7 +398,7 @@ export default function TransactionsPage() {
                             ) : proofs.length > 0 ? (
                                 proofs.map((proof) => (
                                 <TableRow key={proof.id} className={updatingId === proof.id ? 'opacity-50' : ''}>
-                                    <TableCell className="font-medium">{proof.userName}</TableCell>
+                                    <TableCell className="font-medium">{userCache[proof.userId]?.displayName || 'Loading...'}</TableCell>
                                      <TableCell>{formatCurrency(proof.amount)}</TableCell>
                                     <TableCell className="text-muted-foreground">{proof.submittedAt ? formatDistanceToNow(proof.submittedAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
                                     <TableCell className="font-mono text-xs break-all">{proof.proof}</TableCell>
@@ -403,7 +438,7 @@ export default function TransactionsPage() {
                             ) : withdrawals.length > 0 ? (
                                 withdrawals.map((req) => (
                                 <TableRow key={req.id} className={updatingId === req.id ? 'opacity-50' : ''}>
-                                    <TableCell className="font-medium">{req.userName}</TableCell>
+                                    <TableCell className="font-medium">{userCache[req.userId]?.displayName || 'Loading...'}</TableCell>
                                     <TableCell className="text-muted-foreground">{req.requestedAt ? formatDistanceToNow(req.requestedAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
                                     <TableCell className="font-medium">{formatCurrency(req.amount)}</TableCell>
                                     <TableCell>{renderPaymentDetails(req.paymentDetails)}</TableCell>
@@ -454,4 +489,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-

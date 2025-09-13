@@ -69,10 +69,11 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
         const userStatsRef = db.doc(`userStats/${userId}`);
         const dailyEarning = earningsByUid[userId];
         
-        batch.update(userStatsRef, {
+        // This is now an atomic operation, preventing race conditions.
+        batch.set(userStatsRef, {
             availableBalance: FieldValue.increment(dailyEarning),
             todaysEarnings: dailyEarning // Set, not increment, to reflect today's specific earnings
-        });
+        }, { merge: true });
         
         totalCredited += dailyEarning;
     }
@@ -103,3 +104,4 @@ export const calculateAllUserEarnings = ai.defineFlow(
   },
   calculateAndCreditEarnings
 );
+

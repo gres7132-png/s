@@ -42,6 +42,7 @@ import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { requestWithdrawal } from "@/ai/flows/user-management";
 
 const depositSchema = z.object({
   amount: z.coerce.number().positive("Amount must be a positive number."),
@@ -161,18 +162,10 @@ export default function WalletPage() {
   async function onWithdrawalSubmit(values: WithdrawalFormValues) {
     if (!user) { return toast({ variant: "destructive", title: "Not Authenticated" }); }
     if (!savedPaymentDetails) { return toast({ variant: "destructive", title: "No Payment Details", description: "Please save your payment details before requesting a withdrawal."}); }
-    if (values.amount > withdrawableBalance) { return toast({ variant: "destructive", title: "Insufficient Funds" }); }
 
     setIsRequestingWithdrawal(true);
     try {
-        await addDoc(collection(db, "withdrawalRequests"), {
-            userId: user.uid,
-            userName: user.displayName || 'Unknown User',
-            amount: values.amount,
-            requestedAt: serverTimestamp(),
-            status: 'pending',
-            paymentDetails: savedPaymentDetails,
-        });
+        await requestWithdrawal({ amount: values.amount, paymentDetails: savedPaymentDetails });
 
         toast({
           title: "Withdrawal Requested",
@@ -180,12 +173,12 @@ export default function WalletPage() {
         });
         withdrawalForm.reset();
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error submitting withdrawal request:", error);
         toast({
             variant: "destructive",
             title: "Request Failed",
-            description: "Could not submit your withdrawal request. Please try again.",
+            description: error.message || "Could not submit your withdrawal request. Please try again.",
         });
     } finally {
         setIsRequestingWithdrawal(false);
@@ -222,7 +215,6 @@ export default function WalletPage() {
     try {
         await addDoc(collection(db, "transactionProofs"), {
             userId: user.uid,
-            userName: user.displayName || 'Unknown User',
             amount: values.amount,
             proof: values.transactionProof,
             submittedAt: serverTimestamp(),
@@ -540,3 +532,4 @@ export default function WalletPage() {
     </div>
   );
 }
+

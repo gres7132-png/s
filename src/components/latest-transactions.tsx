@@ -10,23 +10,47 @@ import {
 } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, limit, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc, getDoc } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 
 interface Transaction {
     id: string;
     type: 'Deposit' | 'Withdrawal';
-    userName: string;
+    userId: string;
     amount: number;
     timestamp: Timestamp;
 }
 
+interface UserDisplayInfo {
+    displayName?: string;
+}
+
 export default function LatestTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userCache, setUserCache] = useState<Record<string, UserDisplayInfo>>({});
   const [loading, setLoading] = useState(true);
+
+  const fetchUserDetails = useCallback(async (userId: string) => {
+    if (userCache[userId]) {
+        return;
+    }
+    try {
+        const userDocRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+            const userData = {
+                displayName: userDoc.data().displayName,
+            };
+            setUserCache(prev => ({...prev, [userId]: userData}));
+        }
+    } catch (error) {
+        console.error("Failed to fetch user details for cache:", error);
+    }
+  }, [userCache]);
+
 
   useEffect(() => {
     setLoading(true);
@@ -34,46 +58,34 @@ export default function LatestTransactions() {
     const depositsQuery = query(collection(db, "transactionProofs"), orderBy("submittedAt", "desc"), limit(5));
     const withdrawalsQuery = query(collection(db, "withdrawalRequests"), orderBy("requestedAt", "desc"), limit(5));
 
-    const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
+    const processSnapshot = (snapshot: any, type: 'Deposit' | 'Withdrawal') => {
+        snapshot.docChanges().forEach((change: any) => {
             if (change.type === "added") {
                 const data = change.doc.data();
+                if (data.userId) fetchUserDetails(data.userId);
+
                 const newTx: Transaction = {
-                    id: `dep-${change.doc.id}`,
-                    type: 'Deposit',
-                    userName: data.userName,
-                    amount: data.amount || 0, // Assuming deposit amount is stored in proofs
-                    timestamp: data.submittedAt
+                    id: `${type.toLowerCase()}-${change.doc.id}`,
+                    type: type,
+                    userId: data.userId,
+                    amount: data.amount || 0,
+                    timestamp: type === 'Deposit' ? data.submittedAt : data.requestedAt
                 };
                  setTransactions(prev => [...prev, newTx].sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).slice(0, 5));
             }
         });
         setLoading(false);
-    });
+    };
 
-    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => {
-       snapshot.docChanges().forEach((change) => {
-            if (change.type === "added") {
-                const data = change.doc.data();
-                const newTx: Transaction = {
-                    id: `wd-${change.doc.id}`,
-                    type: 'Withdrawal',
-                    userName: data.userName,
-                    amount: data.amount,
-                    timestamp: data.requestedAt
-                };
-                setTransactions(prev => [...prev, newTx].sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis()).slice(0, 5));
-            }
-        });
-        setLoading(false);
-    });
+    const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => processSnapshot(snapshot, 'Deposit'));
+    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => processSnapshot(snapshot, 'Withdrawal'));
     
     return () => {
         unsubDeposits();
         unsubWithdrawals();
     };
 
-  }, []);
+  }, [fetchUserDetails]);
 
   return (
     <Card>
@@ -110,7 +122,7 @@ export default function LatestTransactions() {
                 )}
               </div>
               <div className="flex-grow">
-                <p className="font-medium">{tx.type} by {tx.userName}</p>
+                <p className="font-medium">{tx.type} by {userCache[tx.userId]?.displayName || '... a user'}</p>
                 <p className="text-sm text-muted-foreground">{tx.timestamp ? formatDistanceToNow(tx.timestamp.toDate(), { addSuffix: true }) : 'Just now'}</p>
               </div>
               <div className="font-bold text-right">

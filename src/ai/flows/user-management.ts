@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 if (!getApps().length) {
   if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
@@ -53,6 +53,12 @@ export const ProcessReferralInputSchema = z.object({
   investmentAmount: z.number().positive().describe("The amount of the investment."),
 });
 export type ProcessReferralInput = z.infer<typeof ProcessReferralInputSchema>;
+
+const WithdrawalRequestInputSchema = z.object({
+  amount: z.number().min(1000, "Minimum withdrawal is KES 1,000."),
+  paymentDetails: z.any().describe("The user's saved payment details object."),
+});
+type WithdrawalRequestInput = z.infer<typeof WithdrawalRequestInputSchema>;
 
 /**
  * Lists all users. This implementation uses the Firebase Admin SDK.
@@ -124,23 +130,64 @@ export const processReferral = ai.defineFlow(
     const referrerStatsRef = db.doc(`userStats/${referrerId}`);
     
     try {
-      await referrerStatsRef.update({
+      await referrerStatsRef.set({
         availableBalance: FieldValue.increment(commissionAmount)
-      });
+      }, { merge: true });
       console.log(`Awarded ${commissionAmount} commission to referrer ${referrerId}.`);
       return { success: true, commissionAwarded: commissionAmount };
     } catch (error) {
        console.error(`Failed to award commission to ${referrerId}:`, error);
-       // If the referrer's stats doc doesn't exist, create it.
-       const referrerStatsDoc = await referrerStatsRef.get();
-       if (!referrerStatsDoc.exists) {
-            await referrerStatsRef.set({ availableBalance: commissionAmount });
-            console.log(`Created stats doc and awarded ${commissionAmount} commission to referrer ${referrerId}.`);
-            return { success: true, commissionAwarded: commissionAmount };
-       }
-       // Re-throw if it's another error
-       throw error;
+       // This will now handle creating the doc if it doesn't exist and other errors.
+       throw new Error("Failed to award commission.");
     }
+  }
+);
+
+/**
+ * Creates a withdrawal request after verifying the user's balance on the server.
+ */
+export const requestWithdrawal = ai.defineFlow(
+  {
+    name: 'requestWithdrawalFlow',
+    inputSchema: WithdrawalRequestInputSchema,
+    outputSchema: z.object({ success: z.boolean(), requestId: z.string() }),
+    auth: { user: true }
+  },
+  async ({ amount, paymentDetails }, { auth }) => {
+    if (!auth) throw new Error("Authentication required.");
+    const userId = auth.uid;
+
+    const db = getFirestore();
+    const userStatsRef = db.doc(`userStats/${userId}`);
+    const requestsColRef = db.collection("withdrawalRequests");
+    
+    let requestId = '';
+    
+    await db.runTransaction(async (transaction) => {
+      const userStatsDoc = await transaction.get(userStatsRef);
+      if (!userStatsDoc.exists()) {
+        throw new Error("User stats not found. Cannot process withdrawal.");
+      }
+      
+      const currentBalance = userStatsDoc.data()?.availableBalance || 0;
+      if (currentBalance < amount) {
+        throw new Error(`Insufficient funds. Your balance is KES ${currentBalance}, but you requested KES ${amount}.`);
+      }
+
+      // Important: We do NOT deduct the balance here. Balance is only deducted upon admin approval.
+      // We just create the request.
+      const newRequestRef = requestsColRef.doc();
+      transaction.set(newRequestRef, {
+        userId: userId,
+        amount: amount,
+        paymentDetails: paymentDetails,
+        requestedAt: Timestamp.now(),
+        status: 'pending',
+      });
+      requestId = newRequestRef.id;
+    });
+
+    return { success: true, requestId };
   }
 );
 
