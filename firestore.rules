@@ -22,33 +22,56 @@ function isAdmin() {
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // --- User Data ---
-    // A user can read/write their own data.
+    // --- User Profile Data ---
+    // Users can read/write their own profile. Admins have full access.
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isOwner(userId) || isAdmin();
     }
     
-    // A user can manage their own investments subcollection.
-    match /users/{userId}/investments/{docId} {
-       allow read, write: if isOwner(userId);
+    // --- User Investments ---
+    // A user can manage their own investments. Admins have full access.
+    match /users/{userId}/investments/{investmentId} {
+      allow read, write: if isOwner(userId) || isAdmin();
     }
     
-    // --- User Stats ---
-    // Users can create on sign-up and read their own stats. Only Admins can update.
+    // --- User Financial Stats ---
+    // A user can read their own stats. Only admins can update balances.
     match /userStats/{userId} {
-      allow read, create: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      // Create is allowed for a user on signup.
+      allow create: if isOwner(userId); 
       allow update: if isAdmin();
     }
     
     // --- User Payment Details ---
-    // A user can manage their own payment details.
+    // A user can manage their own payment details. Admins have full access.
     match /userPaymentDetails/{userId} {
-       allow read, write: if isOwner(userId);
+       allow read, write: if isOwner(userId) || isAdmin();
     }
 
-    // --- Investment, Contributor, and Commission Tiers (Publicly Readable, Admin Writable) ---
-    // Any authenticated user can read these configurations.
-    // Only an admin can create, update, or delete them.
+    // --- Deposit Proofs ---
+    // Authenticated users can create deposit proofs. Admins can manage all of them.
+    match /transactionProofs/{proofId} {
+        allow create: if isAuthenticated();
+        allow read, update, delete: if isAdmin();
+    }
+    
+    // --- Withdrawal Requests ---
+    // Authenticated users can create withdrawal requests. Admins can manage all of them.
+    match /withdrawalRequests/{reqId} {
+        allow create: if isAuthenticated();
+        allow read, update, delete: if isAdmin();
+    }
+
+    // --- Contributor Applications ---
+    // Authenticated users can apply. Admins can manage all of them.
+    match /contributorApplications/{appId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- Public, Admin-Managed Collections ---
+    // Any authenticated user can read these, but only admins can write to them.
     match /silverLevelPackages/{packageId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
@@ -62,19 +85,6 @@ service cloud.firestore {
     match /commissionTiers/{tierId} {
         allow read: if isAuthenticated();
         allow write: if isAdmin();
-    }
-
-    // --- Transaction Proofs & Withdrawal Requests (User Create, Admin Manage) ---
-    // Any authenticated user can create a deposit or withdrawal request.
-    // Only an admin can read, update, or delete them.
-    match /transactionProofs/{proofId} {
-        allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin();
-    }
-    
-    match /withdrawalRequests/{reqId} {
-        allow create: if isAuthenticated();
-        allow read, update, delete: if isAdmin();
     }
   }
 }
