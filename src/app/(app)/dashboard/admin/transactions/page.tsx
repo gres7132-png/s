@@ -132,7 +132,7 @@ export default function TransactionsPage() {
     type: 'deposit' | 'withdrawal',
     id: string,
     userId: string,
-    verifiedAmount: number, // Changed from 'amount'
+    verifiedAmount: number,
     status: 'approved' | 'rejected'
   ) => {
     setUpdatingId(id);
@@ -144,61 +144,55 @@ export default function TransactionsPage() {
         await runTransaction(db, async (transaction) => {
             const transactionDocRef = doc(db, collectionName, id);
             const userStatsDocRef = doc(db, "userStats", userId);
+
+            // --- ALL READS MUST HAPPEN FIRST ---
+            const userStatsDoc = await transaction.get(userStatsDocRef);
+            // We don't need to read the transactionDoc itself as we are only writing to it.
             
+            // --- LOGIC & WRITES HAPPEN AFTER ALL READS ---
             let updateData: any = { status };
 
+            // Logic for approved transactions
             if (status === 'approved') {
-                 if (type === 'withdrawal') {
-                    // **FIX:** Calculate service fee based on the *verifiedAmount*, not the original requested amount.
-                    const serviceFee = isTaxFreeDay ? 0 : verifiedAmount * WITHDRAWAL_FEE_RATE;
-                    updateData.serviceFee = serviceFee;
-                    updateData.amount = verifiedAmount;
-                } else {
-                    updateData.amount = verifiedAmount;
-                }
-            }
-
-            // 1. Update the transaction status
-            transaction.update(transactionDocRef, updateData);
-
-            // 2. If approved, update the user's balance
-            if (status === 'approved') {
-                const userStatsDoc = await transaction.get(userStatsDocRef);
-                if (!userStatsDoc.exists() && type === 'deposit') {
-                    // Create the stats doc if it doesn't exist on first deposit
-                     transaction.set(userStatsDocRef, { 
-                        availableBalance: verifiedAmount,
-                        rechargeAmount: verifiedAmount,
-                        withdrawalAmount: 0,
-                        todaysEarnings: 0,
-                     });
-                } else if (userStatsDoc.exists()) {
-                    let newRecharge = userStatsDoc.data()?.rechargeAmount || 0;
-                    let newWithdrawal = userStatsDoc.data()?.withdrawalAmount || 0;
-                    
-                    if (type === 'deposit') {
-                        newRecharge += verifiedAmount;
+                if (type === 'deposit') {
+                    updateData.amount = verifiedAmount; // Update the deposit amount to the verified amount
+                    if (!userStatsDoc.exists()) {
+                        // Create the stats doc if it doesn't exist on first deposit
+                        transaction.set(userStatsDocRef, { 
+                            availableBalance: verifiedAmount,
+                            rechargeAmount: verifiedAmount,
+                            withdrawalAmount: 0,
+                            todaysEarnings: 0,
+                        });
+                    } else {
                         transaction.update(userStatsDocRef, {
                             availableBalance: FieldValue.increment(verifiedAmount),
-                            rechargeAmount: newRecharge,
-                        });
-
-                    } else { // withdrawal
-                         if (userStatsDoc.data()?.availableBalance < verifiedAmount) {
-                            throw new Error("User has insufficient funds for this withdrawal.");
-                        }
-                        const amountToDeduct = verifiedAmount; // The service fee is just for record-keeping, the full requested amount is deducted.
-                        newWithdrawal += amountToDeduct;
-                         transaction.update(userStatsDocRef, {
-                            availableBalance: FieldValue.increment(-amountToDeduct),
-                            withdrawalAmount: newWithdrawal,
+                            rechargeAmount: FieldValue.increment(verifiedAmount),
                         });
                     }
-                } else if (type === 'withdrawal') {
-                    // This should not happen if user can request withdrawal, but as a safeguard:
-                    throw new Error("Cannot process withdrawal for a user with no stats record.");
+                } else { // Withdrawal
+                    const serviceFee = isTaxFreeDay ? 0 : verifiedAmount * WITHDRAWAL_FEE_RATE;
+                    updateData.serviceFee = serviceFee;
+                    updateData.amount = verifiedAmount; // Update the withdrawal amount to the verified amount
+
+                    const currentBalance = userStatsDoc.data()?.availableBalance || 0;
+                    if (currentBalance < verifiedAmount) {
+                        throw new Error("User has insufficient funds for this withdrawal.");
+                    }
+                    if (!userStatsDoc.exists()) {
+                         // This should not happen if a user can request a withdrawal, but as a safeguard:
+                        throw new Error("Cannot process withdrawal for a user with no stats record.");
+                    }
+
+                    transaction.update(userStatsDocRef, {
+                        availableBalance: FieldValue.increment(-verifiedAmount),
+                        withdrawalAmount: FieldValue.increment(verifiedAmount),
+                    });
                 }
             }
+
+            // Finally, update the transaction document itself (for both approved and rejected)
+            transaction.update(transactionDocRef, updateData);
         });
 
         toast({
