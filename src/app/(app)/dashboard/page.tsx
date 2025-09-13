@@ -116,10 +116,10 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-1 text-xs text-muted-foreground">
             <p>
-              1: After waiting for 24 hours, you can withdraw the income from purchasing company products, and you can withdraw cash immediately without any requirements.
+              1: You can withdraw your earnings from purchased products at any time. Withdrawals are processed by our team and may take 3-5 business days.
             </p>
             <p>
-              2: The company's withdrawal requires a 15% tax allowance. However, the company will set a tax-free day for all members on the 23rd of each month. No fees will be deducted on this day.
+              2: To ensure the sustainability of the platform, a 15% service fee is applied to all withdrawals to cover transaction and operational costs.
             </p>
             <p>
               3: You only need to have one account in the company, and multiple accounts are not allowed. The system will automatically block members with multiple accounts.
@@ -132,5 +132,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
