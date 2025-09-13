@@ -37,6 +37,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, doc, where } from "firebase/firestore";
+import { applyForContributorTier } from "@/ai/flows/user-management";
 
 interface ContributorTier {
   id: string;
@@ -122,7 +123,7 @@ export default function DistributorPage() {
       toast({
         variant: "destructive",
         title: "Insufficient Funds",
-        description: "Please make a deposit to apply for this level.",
+        description: `You need at least ${formatCurrency(tier.deposit)} to apply. Please make a deposit.`,
       });
     } else {
       setSelectedTier(tier);
@@ -135,22 +136,22 @@ export default function DistributorPage() {
     setIsApplying(true);
     
     try {
-        // This is a placeholder. In a real application, this would trigger a secure backend flow.
-        console.log(`Processing application for ${selectedTier.level}...`);
+        await applyForContributorTier({
+            tierId: selectedTier.id,
+            tierLevel: selectedTier.level,
+            depositAmount: selectedTier.deposit
+        });
         
         toast({
           title: "Application Successful!",
-          description: `You have applied for the ${selectedTier.level} contributor level. Your application is now pending approval.`,
+          description: `You have applied for the ${selectedTier.level} contributor level. Your deposit has been deducted and your application is now pending approval.`,
         });
 
-        // Optimistically update the UI or refetch data
-        setContributorData(prev => prev ? {...prev, userBalance: prev.userBalance - selectedTier.deposit} : null);
-
-    } catch (error) {
+    } catch (error: any) {
         toast({
             variant: "destructive",
             title: "Application Failed",
-            description: "Could not process your application. Please try again.",
+            description: error.message || "Could not process your application. Please try again.",
         });
     } finally {
         setIsApplying(false);

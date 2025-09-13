@@ -43,6 +43,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { requestWithdrawal } from "@/ai/flows/user-management";
+import { useSearchParams } from "next/navigation";
 
 const depositSchema = z.object({
   amount: z.coerce.number().positive("Amount must be a positive number."),
@@ -72,6 +73,8 @@ type BankingDetailsFormValues = z.infer<typeof bankingDetailsSchema>;
 export default function WalletPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'deposit');
   const [withdrawableBalance, setWithdrawableBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
@@ -299,7 +302,7 @@ export default function WalletPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="deposit" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="deposit">Deposit</TabsTrigger>
           <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
@@ -532,4 +535,3 @@ export default function WalletPage() {
     </div>
   );
 }
-

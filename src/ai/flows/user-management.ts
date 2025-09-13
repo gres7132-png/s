@@ -60,6 +60,14 @@ const WithdrawalRequestInputSchema = z.object({
 });
 type WithdrawalRequestInput = z.infer<typeof WithdrawalRequestInputSchema>;
 
+const ContributorApplicationInputSchema = z.object({
+  tierId: z.string().describe("The ID of the contributor tier being applied for."),
+  tierLevel: z.string().describe("The level name of the tier (e.g., V1)."),
+  depositAmount: z.number().positive().describe("The deposit amount required for the tier."),
+});
+type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSchema>;
+
+
 /**
  * Lists all users. This implementation uses the Firebase Admin SDK.
  * @returns {Promise<ListUsersOutput>} A list of user data.
@@ -190,6 +198,56 @@ export const requestWithdrawal = ai.defineFlow(
     return { success: true, requestId };
   }
 );
+
+
+/**
+ * Processes an application for a contributor tier.
+ * Deducts the deposit from the user's balance and creates an application record.
+ */
+export const applyForContributorTier = ai.defineFlow(
+  {
+    name: 'applyForContributorTierFlow',
+    inputSchema: ContributorApplicationInputSchema,
+    outputSchema: z.object({ success: z.boolean(), applicationId: z.string() }),
+    auth: { user: true }
+  },
+  async ({ tierId, tierLevel, depositAmount }, { auth }) => {
+    if (!auth) throw new Error("Authentication required.");
+    const userId = auth.uid;
+    const db = getFirestore();
+    const userStatsRef = db.doc(`userStats/${userId}`);
+    const applicationsColRef = db.collection("contributorApplications");
+
+    let applicationId = '';
+
+    await db.runTransaction(async (transaction) => {
+      const userStatsDoc = await transaction.get(userStatsRef);
+      if (!userStatsDoc.exists() || (userStatsDoc.data()?.availableBalance || 0) < depositAmount) {
+        throw new Error("Insufficient funds. Please deposit more funds to apply for this tier.");
+      }
+
+      // 1. Deduct the deposit amount from the user's balance
+      transaction.update(userStatsRef, {
+        availableBalance: FieldValue.increment(-depositAmount),
+      });
+
+      // 2. Create the application document for admin review
+      const newApplicationRef = applicationsColRef.doc();
+      transaction.set(newApplicationRef, {
+        userId: userId,
+        tierId: tierId,
+        tierLevel: tierLevel,
+        depositAmount: depositAmount,
+        appliedAt: Timestamp.now(),
+        status: 'pending', // Admins will review and change this to 'approved' or 'rejected'
+      });
+      applicationId = newApplicationRef.id;
+    });
+
+    return { success: true, applicationId };
+  }
+);
+
 
 
 // Define the Genkit flows

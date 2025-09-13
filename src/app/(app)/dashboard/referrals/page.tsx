@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, getDocs, doc, getDoc, where } from "firebase/firestore";
+import { Input } from "@/components/ui/input";
 
 // This interface defines the structure for a referred user object.
 interface ReferredUser {
@@ -113,11 +114,13 @@ export default function ReferralsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 rounded-lg border bg-muted p-2">
-            <p className="flex-grow text-sm truncate text-muted-foreground">
-              {referralLink || "Loading your link..."}
-            </p>
-            <Button size="icon" variant="ghost" onClick={copyToClipboard} disabled={!referralLink}>
+          <div className="flex items-center gap-2">
+            <Input 
+              readOnly 
+              value={referralLink || "Loading your link..."}
+              className="flex-grow bg-muted"
+            />
+            <Button size="icon" variant="outline" onClick={copyToClipboard} disabled={!referralLink}>
               <Copy className="h-4 w-4" />
             </Button>
           </div>
