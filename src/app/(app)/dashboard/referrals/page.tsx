@@ -52,6 +52,7 @@ export default function ReferralsPage() {
       
       const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
         setLoading(true);
+        // Map each referred user document to a promise that resolves with their calculated data.
         const usersPromises = snapshot.docs.map(async (userDoc) => {
             const referredUserId = userDoc.id;
             const referredUserData = userDoc.data();
@@ -77,6 +78,8 @@ export default function ReferralsPage() {
             };
         });
 
+        // Use Promise.all to wait for all the user data calculations to complete.
+        // This prevents race conditions and ensures the UI is only updated with complete data.
         const users = await Promise.all(usersPromises);
         setReferredUsers(users);
         setLoading(false);
