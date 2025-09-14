@@ -97,7 +97,7 @@ export const listAllUsers = ai.defineFlow(
   {
     name: 'listAllUsersFlow',
     outputSchema: ListUsersOutputSchema,
-    auth: { user: true }
+    auth: { user: true, admin: true }
   },
   async (_, flow) => {
     await verifyAdmin(flow);
