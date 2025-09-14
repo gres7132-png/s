@@ -16,6 +16,7 @@ import {
   Shield,
   LifeBuoy,
   Globe,
+  List,
 } from "lucide-react";
 
 import { signOut } from "firebase/auth";
@@ -35,6 +36,7 @@ import {
   SidebarGroup,
   SidebarFooter,
   SidebarSeparator,
+  SidebarMenuBadge,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -50,6 +52,9 @@ import { Logo } from "./logo";
 import type { ReactNode } from "react";
 import { Skeleton } from "./ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -62,7 +67,9 @@ const navItems = [
 ];
 
 const adminNavItems = [
-    { href: "/dashboard/admin", icon: Shield, label: "Admin Panel" },
+    { href: "/dashboard/admin", icon: Shield, label: "Admin Dashboard" },
+    { href: "/dashboard/admin/users", icon: User, label: "Manage Users" },
+    { href: "/dashboard/admin/transactions", icon: List, label: "Transactions" },
 ];
 
 function NavMenu() {
@@ -70,6 +77,36 @@ function NavMenu() {
   const { setOpenMobile, isMobile } = useSidebar();
   const router = useRouter();
   const { auth, isAdmin } = useAuth();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const pendingDepositsQuery = query(collection(db, "transactionProofs"), where("status", "==", "pending"));
+    const pendingWithdrawalsQuery = query(collection(db, "withdrawalRequests"), where("status", "==", "pending"));
+
+    let depositCount = 0;
+    let withdrawalCount = 0;
+
+    const updateCounts = () => {
+      setPendingCount(depositCount + withdrawalCount);
+    };
+
+    const unsubDeposits = onSnapshot(pendingDepositsQuery, (snapshot) => {
+        depositCount = snapshot.size;
+        updateCounts();
+    });
+
+    const unsubWithdrawals = onSnapshot(pendingWithdrawalsQuery, (snapshot) => {
+        withdrawalCount = snapshot.size;
+        updateCounts();
+    });
+
+    return () => {
+      unsubDeposits();
+      unsubWithdrawals();
+    };
+  }, [isAdmin]);
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -108,7 +145,7 @@ function NavMenu() {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname.startsWith(item.href)}
+                      isActive={pathname.startsWith(item.href) && (item.href === '/dashboard/admin' ? pathname === item.href : true)}
                       tooltip={item.label}
                       onClick={handleLinkClick}
                     >
@@ -117,6 +154,9 @@ function NavMenu() {
                         <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>
+                     {item.href === "/dashboard/admin/transactions" && pendingCount > 0 && (
+                        <SidebarMenuBadge>{pendingCount}</SidebarMenuBadge>
+                    )}
                   </SidebarMenuItem>
                 ))}
             </>
