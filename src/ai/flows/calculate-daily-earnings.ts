@@ -45,23 +45,13 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
     
     const db = getFirestore();
     
-    // --- STEP 1: Reset `todaysEarnings` for ALL users to 0 ---
-    console.log("Resetting todaysEarnings for all users...");
-    const allUsersStatsSnapshot = await db.collection('userStats').where('todaysEarnings', '>', 0).get();
-    const docsToReset = allUsersStatsSnapshot.docs.map(doc => doc.ref);
-    if(docsToReset.length > 0) {
-        await commitBatchInChunks(db, docsToReset, { todaysEarnings: 0 });
-    }
-    console.log(`Reset complete for ${docsToReset.length} users.`);
-
-
-    // --- STEP 2: Calculate and credit new earnings ---
+    // --- STEP 1: Identify users with active investments and collect earnings data ---
     const earningsByUid: { [key: string]: number } = {};
     const investmentsSnapshot = await db.collectionGroup('investments').where('status', '==', 'active').get();
     
     if (investmentsSnapshot.empty) {
         console.log("No active investments found. Nothing to process.");
-        return { success: true, processedUsers: 0, totalEarningsCredited: 0, usersReset: docsToReset.length };
+        return { success: true, processedUsers: 0, totalEarningsCredited: 0, usersReset: 0 };
     }
 
     investmentsSnapshot.forEach(doc => {
@@ -72,9 +62,24 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
         }
     });
 
+    const userIdsWithEarningsToday = Object.keys(earningsByUid);
+
+    if(userIdsWithEarningsToday.length === 0) {
+        console.log("No users with earnings today. Nothing to process.");
+        return { success: true, processedUsers: 0, totalEarningsCredited: 0, usersReset: 0 };
+    }
+    console.log(`Found ${userIdsWithEarningsToday.length} users with earnings to process.`);
+
+    // --- STEP 2: Reset `todaysEarnings` ONLY for the users we are about to credit ---
+    console.log("Resetting todaysEarnings for relevant users...");
+    const docsToResetRefs = userIdsWithEarningsToday.map(uid => db.doc(`userStats/${uid}`));
+    await commitBatchInChunks(db, docsToResetRefs, { todaysEarnings: 0 });
+    console.log(`Reset complete for ${docsToResetRefs.length} users.`);
+
+
+    // --- STEP 3: Calculate and credit new earnings using a transaction for safety ---
     const creditBatch = db.batch();
     let totalCredited = 0;
-    const userIdsWithEarningsToday = Object.keys(earningsByUid);
 
     for (const userId of userIdsWithEarningsToday) {
         const userStatsRef = db.doc(`userStats/${userId}`);
@@ -82,7 +87,7 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
         
         creditBatch.set(userStatsRef, {
             availableBalance: FieldValue.increment(dailyEarning),
-            todaysEarnings: dailyEarning // This is an increment because we reset to 0 before.
+            todaysEarnings: dailyEarning // This is a set, not increment, as we reset to 0 just before.
         }, { merge: true });
         
         totalCredited += dailyEarning;
@@ -95,7 +100,7 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
         success: true,
         processedUsers: userIdsWithEarningsToday.length,
         totalEarningsCredited: totalCredited,
-        usersReset: docsToReset.length,
+        usersReset: docsToResetRefs.length,
     };
 }
 

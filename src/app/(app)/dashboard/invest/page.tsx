@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import {
@@ -17,8 +16,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy, getDoc } from "firebase/firestore";
-import { processReferral } from "@/ai/flows/user-management";
+import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
+import { investPackage } from "@/ai/flows/user-management";
 
 interface InvestmentPackage {
   id: string;
@@ -88,46 +87,8 @@ export default function InvestPage() {
     setIsInvesting(pkg.id);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const userStatsDocRef = doc(db, "userStats", user.uid);
-        const userDocRef = doc(db, "users", user.uid);
-        
-        const userStatsDoc = await transaction.get(userStatsDocRef);
-        const userDoc = await transaction.get(userDocRef);
-
-        const currentBalance = userStatsDoc.exists() ? userStatsDoc.data().availableBalance : 0;
-        if (currentBalance < pkg.price) {
-          throw new Error("Insufficient funds.");
-        }
-
-        // 1. Deduct price from balance
-        const newBalance = currentBalance - pkg.price;
-        transaction.update(userStatsDocRef, { availableBalance: newBalance });
-
-        // 2. Create the new investment document
-        const investmentDocRef = doc(collection(db, "users", user.uid, "investments"));
-        transaction.set(investmentDocRef, {
-            name: pkg.name,
-            price: pkg.price,
-            dailyReturn: pkg.dailyReturn,
-            duration: pkg.duration,
-            totalReturn: pkg.totalReturn,
-            startDate: serverTimestamp(),
-            status: "active",
-        });
-
-        // 3. Set hasActiveInvestment to true on the user document if it's not already set
-        if (userDoc.exists() && !userDoc.data().hasActiveInvestment) {
-          transaction.update(userDocRef, { hasActiveInvestment: true });
-        }
-      });
-
-      // 4. After successful transaction, process the referral commission via the secure backend flow.
-      try {
-        await processReferral({ investorId: user.uid, investmentAmount: pkg.price });
-      } catch (referralError: any) {
-        console.error("Referral processing failed:", referralError.message);
-      }
+      // Call the secure backend flow
+      await investPackage({ packageId: pkg.id });
 
       toast({
           title: "Investment Successful!",
@@ -186,7 +147,7 @@ export default function InvestPage() {
               <Button 
                 className="w-full bg-foreground text-background hover:bg-foreground/90"
                 onClick={() => handleInvestment(pkg)}
-                disabled={isLoadingBalance || isInvesting === pkg.id}
+                disabled={isLoadingBalance || isInvesting === pkg.id || userBalance < pkg.price}
               >
                 {isInvesting === pkg.id ? <Loader2 className="animate-spin" /> : "Invest Now"}
               </Button>

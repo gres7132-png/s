@@ -220,7 +220,7 @@ export default function DistributorPage() {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        disabled={loadingData || !prerequisiteMet}
+                        disabled={loadingData || !prerequisiteMet || isApplying}
                         onClick={() => handleApplyClick(tier)}
                       >
                         Apply
@@ -235,7 +235,7 @@ export default function DistributorPage() {
       </div>
       
       {selectedTier && (
-        <AlertDialog open onOpenChange={handleCancelApply}>
+        <AlertDialog open onOpenChange={(open) => !open && handleCancelApply()}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm Application</AlertDialogTitle>
