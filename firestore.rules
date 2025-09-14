@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 // The service cloud.firestore is the database that these rules apply to.
@@ -70,17 +69,10 @@ service cloud.firestore {
     // --- User Payment Details (`userPaymentDetails` collection) ---
     // Stores the user's withdrawal information (bank account, crypto address, etc.).
     match /userPaymentDetails/{userId} {
-      // READ: A user can read their own details, admins can read any.
-      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
-
-      // CREATE: A user can create their payment details document ONLY IF it doesn't already exist.
-      allow create: if isAuthenticated() && isOwner(userId);
-
-      // UPDATE: Only an Admin can update payment details once they are set.
-      allow update: if isAdmin();
-
-      // DELETE: Only an Admin can delete payment details.
-      allow delete: if isAdmin();
+      // READ, WRITE (Create, Update, Delete):
+      // A user has full read and write access to their own payment details.
+      // An admin has full read and write access to any user's payment details.
+      allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
     }
 
     // --- Platform-wide Investment Packages (`silverLevelPackages` collection) ---

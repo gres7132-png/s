@@ -35,7 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, DollarSign, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Copy, DollarSign, Link as LinkIcon, Loader2, Landmark } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
@@ -52,18 +52,22 @@ const depositSchema = z.object({
 type DepositFormValues = z.infer<typeof depositSchema>;
 
 const bankingDetailsSchema = z.object({
-    paymentMethod: z.enum(["mobile", "crypto", "minipay"], { required_error: "Please select a payment method." }),
+    paymentMethod: z.enum(["mobile", "crypto", "minipay", "bank"], { required_error: "Please select a payment method." }),
     mobileNumber: z.string().optional(),
     minipayNumber: z.string().optional(),
     cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
     cryptoAddress: z.string().optional(),
+    bankName: z.string().optional(),
+    bankAccountName: z.string().optional(),
+    bankAccountNumber: z.string().optional(),
 }).refine(data => {
     if (data.paymentMethod === "mobile") return !!data.mobileNumber && data.mobileNumber.length > 0;
     if (data.paymentMethod === "minipay") return !!data.minipayNumber && data.minipayNumber.length > 0;
+    if (data.paymentMethod === "bank") return !!data.bankName && !!data.bankAccountName && !!data.bankAccountNumber;
     if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress && data.cryptoAddress.length > 0;
     return true;
 }, {
-    message: "Please fill in the required details for the selected payment method.",
+    message: "Please fill in all the required details for the selected payment method.",
     path: ["paymentMethod"], // This associates the error with the form as a whole
 });
 
@@ -96,10 +100,6 @@ export default function WalletPage() {
     resolver: zodResolver(bankingDetailsSchema),
     defaultValues: {
       paymentMethod: "mobile",
-      mobileNumber: "",
-      minipayNumber: "",
-      cryptoCurrency: undefined,
-      cryptoAddress: "",
     },
   });
   
@@ -418,7 +418,7 @@ export default function WalletPage() {
             <CardHeader>
               <CardTitle>My Payment Details</CardTitle>
               <CardDescription>
-                This is the information we will use to send you your withdrawals.
+                This is the information we will use to send you your withdrawals. You can update it at any time.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -442,6 +442,7 @@ export default function WalletPage() {
                           <SelectContent>
                             <SelectItem value="minipay">Minipay</SelectItem>
                             <SelectItem value="mobile">Mobile Money (Airtel/Safaricom)</SelectItem>
+                            <SelectItem value="bank">Bank Transfer</SelectItem>
                             <SelectItem value="crypto">Crypto Wallet (BTC, ETH, USDT)</SelectItem>
                           </SelectContent>
                         </Select>
@@ -458,7 +459,7 @@ export default function WalletPage() {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 0712345678" {...field} disabled={isSavingDetails} />
+                            <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ""} disabled={isSavingDetails} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -474,12 +475,30 @@ export default function WalletPage() {
                         <FormItem>
                           <FormLabel>Minipay Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 0781309701" {...field} disabled={isSavingDetails} />
+                            <Input placeholder="e.g. 0781309701" {...field} value={field.value ?? ""} disabled={isSavingDetails} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                  )}
+
+                   {selectedPaymentMethod === 'bank' && (
+                    <div className="space-y-4 rounded-md border p-4">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-5 w-5 text-muted-foreground" />
+                        <h3 className="font-semibold">Bank Account Details</h3>
+                      </div>
+                      <FormField control={bankingDetailsForm.control} name="bankName" render={({ field }) => (
+                          <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input placeholder="e.g. Equity Bank" {...field} value={field.value ?? ""} disabled={isSavingDetails} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={bankingDetailsForm.control} name="bankAccountName" render={({ field }) => (
+                          <FormItem><FormLabel>Account Holder's Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ""} disabled={isSavingDetails} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                       <FormField control={bankingDetailsForm.control} name="bankAccountNumber" render={({ field }) => (
+                          <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input placeholder="Your bank account number" {...field} value={field.value ?? ""} disabled={isSavingDetails} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
                   )}
 
                   {selectedPaymentMethod === "crypto" && (
@@ -513,7 +532,7 @@ export default function WalletPage() {
                           <FormItem>
                             <FormLabel>Wallet Address</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter your wallet address" {...field} disabled={isSavingDetails} />
+                              <Input placeholder="Enter your wallet address" {...field} value={field.value ?? ""} disabled={isSavingDetails} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -534,3 +553,4 @@ export default function WalletPage() {
     </div>
   );
 }
+
