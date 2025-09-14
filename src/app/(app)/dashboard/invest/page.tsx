@@ -88,12 +88,16 @@ export default function InvestPage() {
 
     try {
       // Call the secure backend flow
-      await investPackage({ packageId: pkg.id });
+      const result = await investPackage({ packageId: pkg.id });
 
-      toast({
-          title: "Investment Successful!",
-          description: `You have invested in ${pkg.name}.`,
-      });
+      if (result.success) {
+        toast({
+            title: "Investment Successful!",
+            description: `You have invested in ${pkg.name}.`,
+        });
+      } else {
+        throw new Error("The investment could not be completed.");
+      }
 
     } catch (error: any) {
        toast({

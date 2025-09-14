@@ -11,7 +11,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue, Timestamp, serverTimestamp } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendAdminNotification } from '@/ai/utils/email';
 
 // Centralized Firebase Admin SDK Initialization
@@ -370,14 +370,14 @@ const investPackageFlow = ai.defineFlow(
                 dailyReturn: pkg.dailyReturn,
                 duration: pkg.duration,
                 totalReturn: pkg.totalReturn,
-                startDate: serverTimestamp(),
+                startDate: FieldValue.serverTimestamp(),
                 status: "active",
             });
             investmentId = investmentDocRef.id;
 
             // 3. Set hasActiveInvestment to true on the user document if it's not already set
-            if (userDoc.exists() && !userDoc.data()!.hasActiveInvestment) {
-                transaction.update(userDocRef, { hasActiveInvestment: true });
+            if (!userDoc.exists() || !userDoc.data()?.hasActiveInvestment) {
+                 transaction.set(userDocRef, { hasActiveInvestment: true }, { merge: true });
             }
         });
 
