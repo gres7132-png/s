@@ -35,12 +35,12 @@ interface UserData {
 
 export default function UsersListPage() {
   const { toast } = useToast();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { user: adminUser, isAdmin, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdmin || !adminUser) {
       setLoading(false);
       return;
     }
@@ -54,7 +54,11 @@ export default function UsersListPage() {
             // We can get the disabled status on the detail page
             fetchedUsers.push({ uid: doc.id, ...doc.data() } as UserData);
         });
-        setUsers(fetchedUsers);
+        
+        // Filter out the admin's own user account from the list
+        const filteredUsers = fetchedUsers.filter(user => user.uid !== adminUser.uid);
+        
+        setUsers(filteredUsers);
         setLoading(false);
     }, (error) => {
         console.error("Error fetching users:", error);
@@ -69,7 +73,7 @@ export default function UsersListPage() {
     });
 
     return () => unsubscribe(); // Cleanup listener on component unmount
-  }, [isAdmin, toast]);
+  }, [isAdmin, toast, adminUser]);
 
   if (authLoading) {
     return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -136,7 +140,7 @@ export default function UsersListPage() {
               ) : (
                 <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        No users found.
+                        No other users found.
                     </TableCell>
                 </TableRow>
               )}
