@@ -90,10 +90,20 @@ type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSch
 
 
 /**
+ * Wrapper function for the listAllUsersFlow.
+ * This is the function that should be imported and called from the client.
+ */
+export async function listAllUsers(): Promise<ListUsersOutput> {
+  // The client doesn't pass any arguments, so we call the flow with an empty object.
+  // The flow itself will handle getting the authenticated user context.
+  return listAllUsersFlow();
+}
+
+/**
  * SECURED: Lists all users. Only callable by an admin.
  * @returns {Promise<ListUsersOutput>} A list of user data.
  */
-export const listAllUsers = ai.defineFlow(
+const listAllUsersFlow = ai.defineFlow(
   {
     name: 'listAllUsersFlow',
     outputSchema: ListUsersOutputSchema,
@@ -113,13 +123,20 @@ export const listAllUsers = ai.defineFlow(
   }
 );
 
+/**
+ * Wrapper for updateUserStatusFlow.
+ */
+export async function updateUserStatus(input: UpdateUserStatusInput): Promise<{success: boolean}> {
+    return updateUserStatusFlow(input);
+}
+
 
 /**
  * SECURED: Updates the disabled status of a user. Only callable by an admin.
  * @param {UpdateUserStatusInput} input The user's UID and new status.
  * @returns {Promise<{success: boolean}>} A success flag.
  */
-export const updateUserStatus = ai.defineFlow(
+const updateUserStatusFlow = ai.defineFlow(
     {
         name: 'updateUserStatusFlow',
         inputSchema: UpdateUserStatusInputSchema,
@@ -135,11 +152,18 @@ export const updateUserStatus = ai.defineFlow(
 );
 
 /**
+ * Wrapper for processReferralFlow.
+ */
+export async function processReferral(input: ProcessReferralInput): Promise<{success: boolean, commissionAwarded: number}> {
+    return processReferralFlow(input);
+}
+
+/**
  * Processes a referral commission when a new investment is made.
  * @param {ProcessReferralInput} input The investor's UID and investment amount.
  * @returns {Promise<{success: boolean, commissionAwarded: number}>} A success flag and the commission amount.
  */
-export const processReferral = ai.defineFlow(
+const processReferralFlow = ai.defineFlow(
   {
     name: 'processReferralFlow',
     inputSchema: ProcessReferralInputSchema,
@@ -183,10 +207,18 @@ export const processReferral = ai.defineFlow(
   }
 );
 
+
+/**
+ * Wrapper for requestWithdrawalFlow
+ */
+export async function requestWithdrawal(input: WithdrawalRequestInput): Promise<{ success: boolean, requestId: string }> {
+  return requestWithdrawalFlow(input);
+}
+
 /**
  * Creates a withdrawal request after verifying the user's balance on the server.
  */
-export const requestWithdrawal = ai.defineFlow(
+const requestWithdrawalFlow = ai.defineFlow(
   {
     name: 'requestWithdrawalFlow',
     inputSchema: WithdrawalRequestInputSchema,
@@ -231,12 +263,18 @@ export const requestWithdrawal = ai.defineFlow(
   }
 );
 
+/**
+ * Wrapper for applyForContributorTierFlow
+ */
+export async function applyForContributorTier(input: ContributorApplicationInput): Promise<{ success: boolean, applicationId: string }> {
+  return applyForContributorTierFlow(input);
+}
 
 /**
  * Processes an application for a contributor tier.
  * Deducts the deposit from the user's balance and creates an application record.
  */
-export const applyForContributorTier = ai.defineFlow(
+const applyForContributorTierFlow = ai.defineFlow(
   {
     name: 'applyForContributorTierFlow',
     inputSchema: ContributorApplicationInputSchema,
