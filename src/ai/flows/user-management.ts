@@ -80,6 +80,12 @@ const ContributorApplicationInputSchema = z.object({
 });
 type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSchema>;
 
+export const InvestPackageInputSchema = z.object({
+    packageId: z.string().describe("The ID of the investment package to purchase."),
+});
+export type InvestPackageInput = z.infer<typeof InvestPackageInputSchema>;
+
+
 /**
  * Wrapper for updateUserStatusFlow.
  */
@@ -125,7 +131,7 @@ const processReferralFlow = ai.defineFlow(
     name: 'processReferralFlow',
     inputSchema: ProcessReferralInputSchema,
     outputSchema: z.object({ success: z.boolean(), commissionAwarded: z.number() }),
-    auth: { admin: true } // This flow needs admin to write to another user's stats
+    auth: { user: true }
   },
   async ({ investorId, investmentAmount }) => {
     const db = getFirestore();
@@ -156,8 +162,8 @@ const processReferralFlow = ai.defineFlow(
       return { success: true, commissionAwarded: commissionAmount };
     } catch (error) {
        console.error(`Failed to award commission to ${referrerId}:`, error);
-       // This will now handle creating the doc if it doesn't exist and other errors.
-       throw new Error("Failed to award commission.");
+       // We don't re-throw here to ensure the main investment isn't rolled back if this fails.
+       return { success: false, commissionAwarded: 0 };
     }
   }
 );
@@ -178,7 +184,7 @@ const requestWithdrawalFlow = ai.defineFlow(
     name: 'requestWithdrawalFlow',
     inputSchema: WithdrawalRequestInputSchema,
     outputSchema: z.object({ success: z.boolean(), requestId: z.string() }),
-    auth: { user: true, admin: true }
+    auth: { user: true }
   },
   async ({ amount, paymentDetails }, { auth }) => {
     if (!auth) throw new Error("Authentication required.");
@@ -237,7 +243,7 @@ const submitDepositProofFlow = ai.defineFlow(
     name: 'submitDepositProofFlow',
     inputSchema: DepositProofInputSchema,
     outputSchema: z.object({ success: z.boolean(), proofId: z.string() }),
-    auth: { user: true, admin: true }
+    auth: { user: true }
   },
   async ({ amount, transactionProof }, { auth }) => {
     if (!auth) throw new Error("Authentication required.");
@@ -280,7 +286,7 @@ const applyForContributorTierFlow = ai.defineFlow(
     name: 'applyForContributorTierFlow',
     inputSchema: ContributorApplicationInputSchema,
     outputSchema: z.object({ success: z.boolean(), applicationId: z.string() }),
-    auth: { user: true, admin: true }
+    auth: { user: true }
   },
   async ({ tierId, tierLevel, depositAmount }, { auth }) => {
     if (!auth) throw new Error("Authentication required.");
@@ -316,5 +322,69 @@ const applyForContributorTierFlow = ai.defineFlow(
     });
 
     return { success: true, applicationId };
+  }
+);
+
+/**
+ * Wrapper for investPackageFlow.
+ */
+export async function investPackage(input: InvestPackageInput): Promise<{ success: boolean }> {
+  return investPackageFlow(input);
+}
+
+/**
+ * SECURED: Handles the entire process of a user investing in a package.
+ */
+const investPackageFlow = ai.defineFlow(
+  {
+    name: 'investPackageFlow',
+    inputSchema: InvestPackageInputSchema,
+    outputSchema: z.object({ success: z.boolean() }),
+    auth: { user: true },
+  },
+  async ({ packageId }, { auth }) => {
+    if (!auth) throw new Error('Authentication required.');
+    const userId = auth.uid;
+    const db = getFirestore();
+
+    await db.runTransaction(async (transaction) => {
+      const pkgRef = db.doc(`silverLevelPackages/${packageId}`);
+      const userStatsRef = db.doc(`userStats/${userId}`);
+      const userRef = db.doc(`users/${userId}`);
+
+      // All reads must happen first in a transaction
+      const pkgDoc = await transaction.get(pkgRef);
+      const userStatsDoc = await transaction.get(userStatsRef);
+
+      if (!pkgDoc.exists) {
+        throw new Error('Investment package not found.');
+      }
+      const pkg = pkgDoc.data()!;
+
+      const currentBalance = userStatsDoc.exists() ? userStatsDoc.data()?.availableBalance || 0 : 0;
+      if (currentBalance < pkg.price) {
+        throw new Error('Insufficient funds to purchase this package.');
+      }
+
+      // All writes happen after reads
+      transaction.update(userStatsRef, { availableBalance: FieldValue.increment(-pkg.price) });
+      transaction.update(userRef, { hasActiveInvestment: true });
+
+      const newInvestmentRef = db.collection(`users/${userId}/investments`).doc();
+      transaction.set(newInvestmentRef, {
+        ...pkg,
+        startDate: Timestamp.now(),
+        status: 'active',
+      });
+    });
+
+    // After the transaction succeeds, process the referral commission.
+    // This is done outside the transaction to avoid contention on the referrer's document.
+    const pkgDoc = await db.doc(`silverLevelPackages/${packageId}`).get();
+    if(pkgDoc.exists) {
+      await processReferral({ investorId: userId, investmentAmount: pkgDoc.data()!.price });
+    }
+
+    return { success: true };
   }
 );

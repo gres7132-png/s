@@ -17,8 +17,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, runTransaction, serverTimestamp, collection, addDoc, onSnapshot, query, orderBy, getDoc } from "firebase/firestore";
-import { processReferral } from "@/ai/flows/user-management";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { investPackage } from "@/ai/flows/user-management";
 
 interface InvestmentPackage {
   id: string;
@@ -34,8 +34,6 @@ export default function InvestPage() {
   const { user } = useAuth();
   const [silverLevelPackages, setSilverLevelPackages] = useState<InvestmentPackage[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
-  const [userBalance, setUserBalance] = useState(0);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [isInvesting, setIsInvesting] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,79 +53,13 @@ export default function InvestPage() {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      const userStatsDocRef = doc(db, "userStats", user.uid);
-      const unsubscribe = onSnapshot(userStatsDocRef, (doc) => {
-        if (doc.exists()) {
-          setUserBalance(doc.data().availableBalance || 0);
-        } else {
-          setUserBalance(0);
-        }
-        setIsLoadingBalance(false);
-      }, (error) => {
-        console.error("Error fetching user balance:", error);
-        setIsLoadingBalance(false);
-      });
-      
-      return () => unsubscribe();
-    }
-  }, [user]);
-
   const handleInvestment = async (pkg: InvestmentPackage) => {
     if (!user) return toast({ variant: "destructive", title: "Not Authenticated" });
-    if (userBalance < pkg.price) {
-        toast({
-            variant: "destructive",
-            title: "Insufficient Funds",
-            description: "Please make a deposit to invest in this package.",
-        });
-        return;
-    }
-
+    
     setIsInvesting(pkg.id);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const userStatsDocRef = doc(db, "userStats", user.uid);
-        const userDocRef = doc(db, "users", user.uid);
-        
-        const userStatsDoc = await transaction.get(userStatsDocRef);
-        const userDoc = await transaction.get(userDocRef);
-
-        const currentBalance = userStatsDoc.exists() ? userStatsDoc.data().availableBalance : 0;
-        if (currentBalance < pkg.price) {
-          throw new Error("Insufficient funds.");
-        }
-
-        // 1. Deduct price from balance
-        const newBalance = currentBalance - pkg.price;
-        transaction.update(userStatsDocRef, { availableBalance: newBalance });
-
-        // 2. Create the new investment document
-        const investmentDocRef = doc(collection(db, "users", user.uid, "investments"));
-        transaction.set(investmentDocRef, {
-            name: pkg.name,
-            price: pkg.price,
-            dailyReturn: pkg.dailyReturn,
-            duration: pkg.duration,
-            totalReturn: pkg.totalReturn,
-            startDate: serverTimestamp(),
-            status: "active",
-        });
-
-        // 3. Set hasActiveInvestment to true on the user document if it's not already set
-        if (userDoc.exists() && !userDoc.data().hasActiveInvestment) {
-          transaction.update(userDocRef, { hasActiveInvestment: true });
-        }
-      });
-
-      // 4. After successful transaction, process the referral commission via the secure backend flow.
-      try {
-        await processReferral({ investorId: user.uid, investmentAmount: pkg.price });
-      } catch (referralError: any) {
-        console.error("Referral processing failed:", referralError.message);
-      }
+      await investPackage({ packageId: pkg.id });
 
       toast({
           title: "Investment Successful!",
@@ -186,7 +118,7 @@ export default function InvestPage() {
               <Button 
                 className="w-full bg-foreground text-background hover:bg-foreground/90"
                 onClick={() => handleInvestment(pkg)}
-                disabled={isLoadingBalance || isInvesting === pkg.id}
+                disabled={isInvesting === pkg.id || loadingPackages}
               >
                 {isInvesting === pkg.id ? <Loader2 className="animate-spin" /> : "Invest Now"}
               </Button>
