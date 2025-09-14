@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 // The service cloud.firestore is the database that these rules apply to.
@@ -70,8 +71,8 @@ service cloud.firestore {
     // Stores the user's withdrawal information (bank account, crypto address, etc.).
     match /userPaymentDetails/{userId} {
       // READ, WRITE (Create, Update, Delete):
-      // A user has full read and write access to their own payment details.
-      // An admin has full read and write access to any user's payment details.
+      // A user can manage their own payment details.
+      // Admins can manage any user's payment details.
       allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
     }
 
