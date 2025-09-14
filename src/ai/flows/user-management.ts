@@ -39,7 +39,7 @@ export async function verifyAdmin(flow: any) {
     }
     const auth = getAuth();
     const user = await auth.getUser(flow.auth.uid);
-    // This list MUST be kept in sync with the one in `src/hooks/use-auth.tsx`
+    // This list MUST be kept in sync with the one in your firestore.rules
     const ADMIN_EMAILS = ["gres7132@gmail.com"]; 
     if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
         throw new Error("You do not have permission to perform this action.");
@@ -90,7 +90,7 @@ const updateUserStatusFlow = ai.defineFlow(
         name: 'updateUserStatusFlow',
         inputSchema: UpdateUserStatusInputSchema,
         outputSchema: z.object({ success: z.boolean() }),
-        auth: { user: true }
+        auth: { user: true, admin: true }
     },
     async (input, flow) => {
         await verifyAdmin(flow);
@@ -117,11 +117,9 @@ const processReferralFlow = ai.defineFlow(
     name: 'processReferralFlow',
     inputSchema: ProcessReferralInputSchema,
     outputSchema: z.object({ success: z.boolean(), commissionAwarded: z.number() }),
+    auth: { admin: true } // This flow needs admin to write to another user's stats
   },
   async ({ investorId, investmentAmount }) => {
-    if (!getApps().length) {
-      throw new Error("Admin SDK is not configured. Please check server environment variables.");
-    }
     const db = getFirestore();
     const investorDocRef = db.doc(`users/${investorId}`);
     
@@ -172,7 +170,7 @@ const requestWithdrawalFlow = ai.defineFlow(
     name: 'requestWithdrawalFlow',
     inputSchema: WithdrawalRequestInputSchema,
     outputSchema: z.object({ success: z.boolean(), requestId: z.string() }),
-    auth: { user: true }
+    auth: { user: true, admin: true }
   },
   async ({ amount, paymentDetails }, { auth }) => {
     if (!auth) throw new Error("Authentication required.");
@@ -228,7 +226,7 @@ const applyForContributorTierFlow = ai.defineFlow(
     name: 'applyForContributorTierFlow',
     inputSchema: ContributorApplicationInputSchema,
     outputSchema: z.object({ success: z.boolean(), applicationId: z.string() }),
-    auth: { user: true }
+    auth: { user: true, admin: true }
   },
   async ({ tierId, tierLevel, depositAmount }, { auth }) => {
     if (!auth) throw new Error("Authentication required.");

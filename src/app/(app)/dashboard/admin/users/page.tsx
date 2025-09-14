@@ -24,13 +24,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, ShieldAlert, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query, onSnapshot } from "firebase/firestore";
 
 interface UserData {
   uid: string;
   email?: string;
   displayName?: string;
-  disabled: boolean; // This field might not be on the user doc, but we'll handle it.
+  disabled?: boolean; // This comes from the auth record, not firestore doc.
 }
 
 export default function UsersListPage() {
@@ -45,24 +45,19 @@ export default function UsersListPage() {
       return;
     }
 
-    const fetchUsers = async () => {
-      setLoading(true);
-      try {
-        // Fetch users directly from the 'users' collection.
-        // Firestore rules will ensure only admins can perform this action.
-        const usersSnapshot = await getDocs(query(collection(db, "users")));
-        const fetchedUsers = usersSnapshot.docs.map(doc => ({
-            uid: doc.id,
-            ...doc.data(),
-        })) as UserData[]; // We assume the structure matches for now.
-        
-        // Note: The 'disabled' status is on the Auth record, not Firestore.
-        // For a purely client-side fetch, we can't get this easily.
-        // The listAllUsers backend flow is the correct way to get 'disabled' status.
-        // Reverting to a simpler display until that flow is fixed.
+    setLoading(true);
+    // Realtime listener for the users collection
+    const usersQuery = query(collection(db, "users"));
+    const unsubscribe = onSnapshot(usersQuery, (querySnapshot) => {
+        const fetchedUsers: UserData[] = [];
+        querySnapshot.forEach((doc) => {
+            // We can get the disabled status on the detail page
+            fetchedUsers.push({ uid: doc.id, ...doc.data() } as UserData);
+        });
         setUsers(fetchedUsers);
-
-      } catch (error: any) {
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching users:", error);
         toast({
           variant: "destructive",
           title: "Failed to Fetch Users",
@@ -70,14 +65,10 @@ export default function UsersListPage() {
             ? "You do not have permission to view this list. Ensure you are an admin."
             : error.message || "Could not retrieve the user list.",
         });
-      } finally {
         setLoading(false);
-      }
-    };
+    });
 
-    if (isAdmin) {
-      fetchUsers();
-    }
+    return () => unsubscribe(); // Cleanup listener on component unmount
   }, [isAdmin, toast]);
 
   if (authLoading) {
@@ -107,7 +98,7 @@ export default function UsersListPage() {
         <CardHeader>
           <CardTitle>All Users</CardTitle>
           <CardDescription>
-            A list of all users who have registered an account. Note: Account status (Active/Suspended) is only visible on the user's detail page.
+            A list of all users who have registered an account. Click 'View Details' to manage a user.
           </CardDescription>
         </CardHeader>
         <CardContent>

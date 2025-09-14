@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,8 +70,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { updateBalance, updateInvestment, deleteInvestment } from "@/ai/flows/admin-actions";
 
-// This temporary UserData is for the client-side fetch.
-// The disabled status comes from the `updateUserStatus` flow.
+// This represents the user data fetched from Firestore and Auth.
 interface UserData {
   uid: string;
   email?: string;
@@ -120,16 +118,19 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     try {
         const userDocRef = doc(db, "users", userId);
         const userDoc = await getDoc(userDocRef);
+        
+        // This is a placeholder for getting disabled status. In a real app,
+        // you'd call a backend flow that uses the Admin SDK to get this.
+        // For now, we'll manage it locally on this page after an action.
+        const disabledStatus = false; // Placeholder
+
         if (userDoc.exists()) {
-            // We can't get disabled status here, so we fetch it separately if needed
-            // or rely on the status from a more complex state management.
-            // For now, we'll manage it locally on this page after an action.
             const data = userDoc.data();
             setUser({ 
                 uid: userDoc.id, 
                 displayName: data.displayName,
                 email: data.email,
-                disabled: false // Assume not disabled initially
+                disabled: disabledStatus 
             });
         } else {
              toast({ variant: "destructive", title: "User Not Found" });

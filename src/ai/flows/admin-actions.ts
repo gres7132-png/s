@@ -9,9 +9,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { verifyAdmin } from '@/ai/flows/user-management'; // Import from the central location
 
 
@@ -35,14 +33,16 @@ export const UpdateBalanceInputSchema = z.object({
 });
 type UpdateBalanceInput = z.infer<typeof UpdateBalanceInputSchema>;
 
-export const updateBalance = ai.defineFlow(
+export async function updateBalance(input: UpdateBalanceInput): Promise<{success: boolean}> {
+    return updateBalanceFlow(input);
+}
+
+const updateBalanceFlow = ai.defineFlow(
   {
     name: 'updateBalanceFlow',
     inputSchema: UpdateBalanceInputSchema,
     outputSchema: z.object({ success: z.boolean() }),
-    auth: {
-        user: true // Require user authentication
-    }
+    auth: { user: true, admin: true }
   },
   async (input, flow) => {
     await verifyAdmin(flow);
@@ -67,12 +67,16 @@ export const UpdateInvestmentInputSchema = z.object({
 });
 type UpdateInvestmentInput = z.infer<typeof UpdateInvestmentInputSchema>;
 
-export const updateInvestment = ai.defineFlow(
+export async function updateInvestment(input: UpdateInvestmentInput): Promise<{success: boolean}> {
+    return updateInvestmentFlow(input);
+}
+
+const updateInvestmentFlow = ai.defineFlow(
   {
     name: 'updateInvestmentFlow',
     inputSchema: UpdateInvestmentInputSchema,
     outputSchema: z.object({ success: z.boolean() }),
-    auth: { user: true }
+    auth: { user: true, admin: true }
   },
   async (input, flow) => {
     await verifyAdmin(flow);
@@ -101,12 +105,16 @@ export const DeleteInvestmentInputSchema = z.object({
 });
 type DeleteInvestmentInput = z.infer<typeof DeleteInvestmentInputSchema>;
 
-export const deleteInvestment = ai.defineFlow(
+export async function deleteInvestment(input: DeleteInvestmentInput): Promise<{success: boolean}> {
+    return deleteInvestmentFlow(input);
+}
+
+const deleteInvestmentFlow = ai.defineFlow(
   {
     name: 'deleteInvestmentFlow',
     inputSchema: DeleteInvestmentInputSchema,
     outputSchema: z.object({ success: z.boolean() }),
-    auth: { user: true }
+    auth: { user: true, admin: true }
   },
   async (input, flow) => {
     await verifyAdmin(flow);
@@ -129,12 +137,16 @@ export const UpdateContributorApplicationInputSchema = z.object({
 });
 export type UpdateContributorApplicationInput = z.infer<typeof UpdateContributorApplicationInputSchema>;
 
-export const updateContributorApplicationStatus = ai.defineFlow(
+export async function updateContributorApplicationStatus(input: UpdateContributorApplicationInput): Promise<{success: boolean}> {
+    return updateContributorApplicationStatusFlow(input);
+}
+
+const updateContributorApplicationStatusFlow = ai.defineFlow(
   {
     name: 'updateContributorApplicationStatusFlow',
     inputSchema: UpdateContributorApplicationInputSchema,
     outputSchema: z.object({ success: z.boolean() }),
-    auth: { user: true },
+    auth: { user: true, admin: true },
   },
   async (input, flow) => {
     await verifyAdmin(flow);
