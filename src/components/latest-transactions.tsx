@@ -13,7 +13,7 @@ import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc, getDoc, where } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from "@/hooks/use-auth";
 
@@ -55,21 +55,19 @@ export default function LatestTransactions() {
 
 
   useEffect(() => {
-    // Only start fetching once the user is authenticated, to ensure we have user context if needed,
-    // even though the queries are now global.
     if (!user) return;
 
     setLoading(true);
     
-    // CORRECTED: Queries now fetch the latest 5 transactions from the entire collection,
-    // not just for the current user.
     const depositsQuery = query(
         collection(db, "transactionProofs"), 
+        where("status", "==", "approved"),
         orderBy("submittedAt", "desc"), 
         limit(5)
     );
     const withdrawalsQuery = query(
         collection(db, "withdrawalRequests"), 
+        where("status", "==", "approved"),
         orderBy("requestedAt", "desc"), 
         limit(5)
     );
@@ -79,9 +77,6 @@ export default function LatestTransactions() {
             if (change.type === "added" || change.type === "modified") {
                 const data = change.doc.data();
                 if (data.userId) fetchUserDetails(data.userId);
-
-                // We only care about approved transactions for a live feed
-                if (data.status !== 'approved') return;
 
                 const newTx: Transaction = {
                     id: `${type.toLowerCase()}-${change.doc.id}`,
@@ -140,7 +135,7 @@ export default function LatestTransactions() {
           ))}
           {!loading && transactions.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">
-              No recent transactions.
+              No recent approved transactions.
             </p>
           )}
           {!loading && transactions.map((tx) => (
@@ -153,7 +148,7 @@ export default function LatestTransactions() {
                 )}
               </div>
               <div className="flex-grow">
-                <p className="font-medium">{tx.type} by {userCache[tx.userId]?.displayName || '... a user'}</p>
+                <p className="font-medium">{tx.type} by {userCache[tx.userId]?.displayName || 'a user'}</p>
                 <p className="text-sm text-muted-foreground">{tx.timestamp ? formatDistanceToNow(tx.timestamp.toDate(), { addSuffix: true }) : 'Just now'}</p>
               </div>
               <div className="font-bold text-right">
