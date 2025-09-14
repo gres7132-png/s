@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, useCallback } from "react";
-import { Ban, CheckCircle, Info, Loader2, Pencil, ShieldAlert, Trash2 } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Ban, CheckCircle, DollarSign, Info, Loader2, Pencil, ShieldAlert, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -69,8 +69,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { updateBalance, updateInvestment, deleteInvestment } from "@/ai/flows/admin-actions";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// This represents the user data fetched from Firestore and Auth.
+
+// --- Data Interfaces ---
 interface UserData {
   uid: string;
   email?: string;
@@ -78,10 +80,16 @@ interface UserData {
   disabled: boolean;
 }
 
+interface UserStats {
+  availableBalance: number;
+  todaysEarnings: number;
+  rechargeAmount: number;
+  withdrawalAmount: number;
+}
+
 const balanceSchema = z.object({
   availableBalance: z.coerce.number().min(0, "Balance cannot be negative."),
 });
-
 type BalanceFormValues = z.infer<typeof balanceSchema>;
 
 const investmentSchema = z.object({
@@ -103,10 +111,14 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const { userId } = params;
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
+  
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  
   const [user, setUser] = useState<UserData | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
   const [investments, setInvestments] = useState<Investment[]>([]);
+  
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
 
   const balanceForm = useForm<BalanceFormValues>();
@@ -119,10 +131,9 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         const userDocRef = doc(db, "users", userId);
         const userDoc = await getDoc(userDocRef);
         
-        // This is a placeholder for getting disabled status. In a real app,
-        // you'd call a backend flow that uses the Admin SDK to get this.
-        // For now, we'll manage it locally on this page after an action.
-        const disabledStatus = false; // Placeholder
+        // This is a placeholder for getting disabled status from Auth.
+        // For now, we'll manage it locally after an action.
+        const disabledStatus = false; 
 
         if (userDoc.exists()) {
             const data = userDoc.data();
@@ -147,13 +158,19 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
 
     fetchUserData();
 
+    // Real-time listener for user stats
     const userStatsRef = doc(db, "userStats", userId);
     const unsubStats = onSnapshot(userStatsRef, (doc) => {
         if (doc.exists()) {
-            balanceForm.reset({ availableBalance: doc.data().availableBalance || 0 });
+            const data = doc.data() as UserStats;
+            setStats(data);
+            balanceForm.reset({ availableBalance: data.availableBalance || 0 });
+        } else {
+            setStats({ availableBalance: 0, todaysEarnings: 0, rechargeAmount: 0, withdrawalAmount: 0 });
         }
     });
 
+    // Real-time listener for user investments
     const investmentsQuery = query(collection(db, `users/${userId}/investments`), orderBy("startDate", "desc"));
     const unsubInvestments = onSnapshot(investmentsQuery, (snapshot) => {
         const fetchedInvestments: Investment[] = [];
@@ -268,12 +285,19 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
      );
   }
 
+  const statCards = [
+    { title: "Available Balance", icon: DollarSign, value: stats?.availableBalance },
+    { title: "Today's Earnings", icon: Activity, value: stats?.todaysEarnings },
+    { title: "Recharge Amount", icon: ArrowUp, value: stats?.rechargeAmount },
+    { title: "Withdrawal Amount", icon: ArrowDown, value: stats?.withdrawalAmount },
+  ];
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Manage User: {user.displayName}</h1>
         <p className="text-muted-foreground">
-          View and edit user details, account status, and activity.
+          View and edit user details, account status, and activity in real-time.
         </p>
       </div>
 
@@ -299,37 +323,6 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
                 </div>
             </CardContent>
           </Card>
-          
-           <Card>
-             <Form {...balanceForm}>
-                <form onSubmit={balanceForm.handleSubmit(onBalanceSubmit)}>
-                  <CardHeader>
-                      <CardTitle>Account Stats</CardTitle>
-                      <CardDescription>Directly modify the user's available balance.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                       <FormField
-                          control={balanceForm.control}
-                          name="availableBalance"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Available Balance (KES)</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} disabled={actionLoading} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                  </CardContent>
-                  <CardFooter>
-                      <Button type="submit" className="w-full" disabled={actionLoading || !balanceForm.formState.isDirty}>
-                          {actionLoading ? <Loader2 className="animate-spin" /> : "Save Balance"}
-                      </Button>
-                  </CardFooter>
-                </form>
-            </Form>
-          </Card>
 
            <Card>
             <CardHeader>
@@ -353,7 +346,61 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
         <div className="lg:col-span-2 space-y-8">
             <Card>
                 <CardHeader>
-                    <CardTitle>User Activity</CardTitle>
+                    <CardTitle>User's Control Panel</CardTitle>
+                    <CardDescription>A real-time view of the user's financial statistics.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <div className="grid grid-cols-2 gap-4">
+                        {statCards.map(item => (
+                            <div key={item.title} className="p-4 bg-muted/50 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium text-muted-foreground">{item.title}</p>
+                                    <item.icon className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div className="mt-2">
+                                     {stats === null ? <Skeleton className="h-7 w-3/4" /> : <p className="text-2xl font-bold">{formatCurrency(item.value ?? 0)}</p>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+
+             <Card>
+             <Form {...balanceForm}>
+                <form onSubmit={balanceForm.handleSubmit(onBalanceSubmit)}>
+                  <CardHeader>
+                      <CardTitle>Edit Balance</CardTitle>
+                      <CardDescription>Manually set the user's available balance.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                       <FormField
+                          control={balanceForm.control}
+                          name="availableBalance"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Available Balance (KES)</FormLabel>
+                              <FormControl>
+                                <Input type="number" {...field} disabled={actionLoading} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                  </CardContent>
+                  <CardFooter>
+                      <Button type="submit" className="w-full" disabled={actionLoading || !balanceForm.formState.isDirty}>
+                          {actionLoading ? <Loader2 className="animate-spin" /> : "Save Balance"}
+                      </Button>
+                  </CardFooter>
+                </form>
+            </Form>
+          </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>User Investments</CardTitle>
+                     <CardDescription>View and manage all active and completed investments for this user.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Tabs defaultValue="investments">
@@ -446,3 +493,5 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     </div>
   );
 }
+
+    
