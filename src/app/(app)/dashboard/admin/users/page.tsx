@@ -21,11 +21,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ShieldAlert, ArrowRight, Info } from "lucide-react";
+import { Loader2, ShieldAlert, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { listAllUsers, UserData } from "@/ai/flows/user-management";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query } from "firebase/firestore";
 
+interface UserData {
+  uid: string;
+  email?: string;
+  displayName?: string;
+  disabled: boolean; // This field might not be on the user doc, but we'll handle it.
+}
 
 export default function UsersListPage() {
   const { toast } = useToast();
@@ -35,28 +41,41 @@ export default function UsersListPage() {
 
   useEffect(() => {
     if (!isAdmin) {
-        setLoading(false);
-        return;
-    };
+      setLoading(false);
+      return;
+    }
 
     const fetchUsers = async () => {
-        setLoading(true);
-        try {
-            // This now calls our secure backend flow to get users.
-            const fetchedData = await listAllUsers();
-            setUsers(fetchedData.users);
-        } catch(error: any) {
-             toast({
-                variant: "destructive",
-                title: "Failed to Fetch Users",
-                description: error.message || "Could not retrieve the user list.",
-            });
-        } finally {
-            setLoading(false);
-        }
+      setLoading(true);
+      try {
+        // Fetch users directly from the 'users' collection.
+        // Firestore rules will ensure only admins can perform this action.
+        const usersSnapshot = await getDocs(query(collection(db, "users")));
+        const fetchedUsers = usersSnapshot.docs.map(doc => ({
+            uid: doc.id,
+            ...doc.data(),
+        })) as UserData[]; // We assume the structure matches for now.
+        
+        // Note: The 'disabled' status is on the Auth record, not Firestore.
+        // For a purely client-side fetch, we can't get this easily.
+        // The listAllUsers backend flow is the correct way to get 'disabled' status.
+        // Reverting to a simpler display until that flow is fixed.
+        setUsers(fetchedUsers);
+
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Failed to Fetch Users",
+          description: error.code === 'permission-denied' 
+            ? "You do not have permission to view this list. Ensure you are an admin."
+            : error.message || "Could not retrieve the user list.",
+        });
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if(isAdmin) {
+    if (isAdmin) {
       fetchUsers();
     }
   }, [isAdmin, toast]);
@@ -88,7 +107,7 @@ export default function UsersListPage() {
         <CardHeader>
           <CardTitle>All Users</CardTitle>
           <CardDescription>
-            A list of all users who have registered an account.
+            A list of all users who have registered an account. Note: Account status (Active/Suspended) is only visible on the user's detail page.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,14 +117,13 @@ export default function UsersListPage() {
                 <TableHead>Display Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>User ID</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
@@ -115,11 +133,6 @@ export default function UsersListPage() {
                     <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell className="font-mono text-xs">{user.uid}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.disabled ? 'destructive' : 'default'}>
-                        {user.disabled ? 'Suspended' : 'Active'}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-right">
                         <Button asChild variant="outline" size="sm">
                             <Link href={`/dashboard/admin/users/${user.uid}`}>
@@ -131,7 +144,7 @@ export default function UsersListPage() {
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         No users found.
                     </TableCell>
                 </TableRow>

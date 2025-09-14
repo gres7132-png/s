@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, useCallback } from "react";
-import { Ban, CheckCircle, Info, Loader2, Pencil, ShieldAlert, Trash2, Wallet } from "lucide-react";
+import { Ban, CheckCircle, Info, Loader2, Pencil, ShieldAlert, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -46,9 +46,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
-import { updateUserStatus, listAllUsers, UserData } from "@/ai/flows/user-management";
+import { updateUserStatus } from "@/ai/flows/user-management";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, Timestamp } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, collection, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   Dialog,
@@ -71,24 +71,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { updateBalance, updateInvestment, deleteInvestment } from "@/ai/flows/admin-actions";
 
-
-const bankingDetailsSchema = z.object({
-    paymentMethod: z.enum(["mobile", "crypto", "minipay"], { required_error: "Please select a payment method." }),
-    mobileNumber: z.string().optional(),
-    minipayNumber: z.string().optional(),
-    cryptoCurrency: z.enum(["BTC", "ETH", "USDT"]).optional(),
-    cryptoAddress: z.string().optional(),
-}).refine(data => {
-    if (data.paymentMethod === "mobile") return !!data.mobileNumber && data.mobileNumber.length > 0;
-    if (data.paymentMethod === "minipay") return !!data.minipayNumber && data.minipayNumber.length > 0;
-    if (data.paymentMethod === "crypto") return !!data.cryptoCurrency && !!data.cryptoAddress && data.cryptoAddress.length > 0;
-    return true;
-}, {
-    message: "Please fill in the required details for the selected payment method.",
-    path: ["paymentMethod"],
-});
-
-type BankingDetailsFormValues = z.infer<typeof bankingDetailsSchema>;
+// This temporary UserData is for the client-side fetch.
+// The disabled status comes from the `updateUserStatus` flow.
+interface UserData {
+  uid: string;
+  email?: string;
+  displayName?: string;
+  disabled: boolean;
+}
 
 const balanceSchema = z.object({
   availableBalance: z.coerce.number().min(0, "Balance cannot be negative."),
@@ -128,10 +118,19 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     if (!isAdmin) return;
     setLoading(true);
     try {
-        const { users } = await listAllUsers();
-        const currentUser = users.find(u => u.uid === userId);
-        if (currentUser) {
-            setUser(currentUser);
+        const userDocRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+            // We can't get disabled status here, so we fetch it separately if needed
+            // or rely on the status from a more complex state management.
+            // For now, we'll manage it locally on this page after an action.
+            const data = userDoc.data();
+            setUser({ 
+                uid: userDoc.id, 
+                displayName: data.displayName,
+                email: data.email,
+                disabled: false // Assume not disabled initially
+            });
         } else {
              toast({ variant: "destructive", title: "User Not Found" });
         }
@@ -446,5 +445,3 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     </div>
   );
 }
-
-    

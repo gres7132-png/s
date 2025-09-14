@@ -46,22 +46,6 @@ export async function verifyAdmin(flow: any) {
     }
 }
 
-
-// Schema for a single user's data returned by the list flow
-export const UserDataSchema = z.object({
-  uid: z.string(),
-  email: z.string().optional(),
-  displayName: z.string().optional(),
-  disabled: z.boolean(),
-});
-export type UserData = z.infer<typeof UserDataSchema>;
-
-// Output schema for the user list flow
-export const ListUsersOutputSchema = z.object({
-  users: z.array(UserDataSchema),
-});
-export type ListUsersOutput = z.infer<typeof ListUsersOutputSchema>;
-
 // Input schema for updating a user's status
 export const UpdateUserStatusInputSchema = z.object({
   uid: z.string().describe("The UID of the user to update."),
@@ -87,41 +71,6 @@ const ContributorApplicationInputSchema = z.object({
   depositAmount: z.number().positive().describe("The deposit amount required for the tier."),
 });
 type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSchema>;
-
-
-/**
- * Wrapper function for the listAllUsersFlow.
- * This is the function that should be imported and called from the client.
- */
-export async function listAllUsers(): Promise<ListUsersOutput> {
-  // The client doesn't pass any arguments, so we call the flow with an empty object.
-  // The flow itself will handle getting the authenticated user context.
-  return listAllUsersFlow();
-}
-
-/**
- * SECURED: Lists all users. Only callable by an admin.
- * @returns {Promise<ListUsersOutput>} A list of user data.
- */
-const listAllUsersFlow = ai.defineFlow(
-  {
-    name: 'listAllUsersFlow',
-    outputSchema: ListUsersOutputSchema,
-    auth: { user: true, admin: true }
-  },
-  async (_, flow) => {
-    await verifyAdmin(flow);
-    const auth = getAuth();
-    const userRecords = await auth.listUsers();
-    const users = userRecords.users.map(user => ({
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      disabled: user.disabled,
-    }));
-    return { users };
-  }
-);
 
 /**
  * Wrapper for updateUserStatusFlow.
