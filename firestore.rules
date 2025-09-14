@@ -1,92 +1,67 @@
+
 rules_version = '2';
-
-// --- Admin Configuration ---
-// This list MUST be kept in sync with the ADMIN_EMAILS array in src/hooks/use-auth.tsx
-function getAdminEmails() {
-  return ["gres7132@gmail.com"];
-}
-
-// --- Helper Functions ---
-function isAuthenticated() {
-  return request.auth != null;
-}
-
-function isOwner(userId) {
-  return request.auth.uid == userId;
-}
-
-function isAdmin() {
-  return isAuthenticated() && request.auth.token.email in getAdminEmails();
-}
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // --- User Data (`users`) ---
-    // Users can read and write their own profile data.
+
+    // --- Helper Functions ---
+    // Checks if the requesting user is the owner of the document.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Checks if the requesting user is an administrator.
+    // This email list MUST be kept in sync with the one in `src/hooks/use-auth.tsx`
+    function isAdmin() {
+      return request.auth.token.email in ["gres7132@gmail.com"];
+    }
+
+    // --- User Data ---
+    // Users can create/update their own profile. Admins can do anything.
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
-      // Admins are covered by the wildcard rule at the bottom.
-    }
-    
-    // --- User Investments Subcollection ---
-    // Users can read and write their own investments.
-    match /users/{userId}/investments/{docId} {
-       allow read, write: if isOwner(userId);
-    }
-    
-    // --- User Stats (`userStats`) ---
-    // Users can read their own stats. Admins can update them.
-    match /userStats/{userId} {
-      allow read: if isOwner(userId);
-      // Creation happens on signup. Updates are admin-only via backend flows.
-      // The admin's ability to write is handled by the wildcard rule.
-    }
-    
-    // --- User Payment Details (`userPaymentDetails`) ---
-    // Users can read and write their own payment details.
-    match /userPaymentDetails/{userId} {
-       allow read, write: if isOwner(userId);
-    }
-
-    // --- Platform-wide Packages & Tiers (Read-Only for Users) ---
-    // Any authenticated user can read the available packages and tiers.
-    match /silverLevelPackages/{packageId} {
-      allow read: if isAuthenticated();
-    }
-    match /contributorTiers/{tierId} {
-      allow read: if isAuthenticated();
-    }
-    match /commissionTiers/{tierId} {
-        allow read: if isAuthenticated();
-    }
-
-    // --- Transaction Proofs (Deposits) ---
-    // Users can create proofs and read their own.
-    match /transactionProofs/{proofId} {
-        allow create: if isAuthenticated();
-        allow read: if isOwner(request.resource.data.userId);
-    }
-    
-    // --- Withdrawal Requests ---
-    // Users can create requests and read their own.
-    match /withdrawalRequests/{reqId} {
-        allow create: if isAuthenticated();
-        allow read: if isOwner(request.resource.data.userId);
-    }
-
-    // --- Contributor Applications ---
-    // Users can create applications and read their own.
-    match /contributorApplications/{appId} {
-      allow create: if isAuthenticated();
-      allow read: if isOwner(request.resource.data.userId);
-    }
-
-    // --- ADMIN SUPERUSER ACCESS (WILDCARD) ---
-    // This rule grants administrators full read/write access to EVERY document
-    // in the entire database. This is the master key for the admin panel.
-    match /{path=**}/{document} {
+      // Users can manage their own profile, but cannot delete it.
+      allow read, create, update: if isOwner(userId);
+      // Admins can read, write, AND delete any user's profile.
       allow read, write: if isAdmin();
+    }
+    
+    // Users can fully manage their own sub-collections. Admins can too.
+    match /users/{userId}/{collection}/{docId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // --- User Statistics (Balances) ---
+    // Critical for financial data security.
+    match /userStats/{userId} {
+      // Users can create their own stats doc (on signup) and read it.
+      allow create, read: if isOwner(userId);
+      // ONLY an admin can update a user's balance. Users cannot.
+      allow update: if isAdmin();
+      // Admins can read any user's stats.
+      allow read: if isAdmin();
+    }
+
+    // --- User Payment Details ---
+    // Users can manage their own payment details. Admins can too.
+    match /userPaymentDetails/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    
+    // --- Platform Configuration (Packages & Tiers) ---
+    // Anyone logged in can read these configurations.
+    match /(silverLevelPackages|contributorTiers|commissionTiers)/{docId} {
+      allow read: if request.auth != null;
+      // Only admins can modify the platform's packages and tiers.
+      allow write: if isAdmin();
+    }
+    
+    // --- Transaction & Application Flows ---
+    // Covers deposits, withdrawals, and contributor applications.
+    match /(transactionProofs|withdrawalRequests|contributorApplications)/{docId} {
+        // Any authenticated user can create a request/application.
+        allow create: if request.auth != null;
+        // Only the user who created it or an admin can view/update it.
+        allow read, update: if isOwner(request.resource.data.userId) || isAdmin();
     }
   }
 }
