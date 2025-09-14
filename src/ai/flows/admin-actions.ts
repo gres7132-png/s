@@ -12,37 +12,8 @@ import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { verifyAdmin } from '@/ai/flows/user-management'; // Import from the central location
 
-// Initialize Firebase Admin SDK if not already initialized
-if (!getApps().length) {
-  if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
-    console.error("FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
-  } else {
-    try {
-      initializeApp({
-        credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG))
-      });
-    } catch (e: any) {
-      console.error("Admin SDK initialization failed:", e.message);
-    }
-  }
-}
-
-// --- Helper to verify admin status ---
-async function verifyAdmin(flow: any) {
-    if (!getApps().length) {
-        throw new Error("Admin SDK is not configured. Check server environment variables.");
-    }
-    if (!flow.auth) {
-        throw new Error("Authentication is required.");
-    }
-    const auth = getAuth();
-    const user = await auth.getUser(flow.auth.uid);
-    const ADMIN_EMAILS = ["gres7132@gmail.com"]; // Keep this in sync with use-auth.tsx
-    if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
-        throw new Error("You do not have permission to perform this action.");
-    }
-}
 
 // --- Helper to synchronize hasActiveInvestment flag ---
 async function syncHasActiveInvestment(db: FirebaseFirestore.Firestore, userId: string) {
@@ -147,6 +118,48 @@ export const deleteInvestment = ai.defineFlow(
     // After deleting, synchronize the user's active status.
     await syncHasActiveInvestment(db, input.userId);
     
+    return { success: true };
+  }
+);
+
+// --- Admin Contributor Application Management ---
+export const UpdateContributorApplicationInputSchema = z.object({
+  applicationId: z.string(),
+  status: z.enum(['approved', 'rejected']),
+});
+export type UpdateContributorApplicationInput = z.infer<typeof UpdateContributorApplicationInputSchema>;
+
+export const updateContributorApplicationStatus = ai.defineFlow(
+  {
+    name: 'updateContributorApplicationStatusFlow',
+    inputSchema: UpdateContributorApplicationInputSchema,
+    outputSchema: z.object({ success: z.boolean() }),
+    auth: { user: true },
+  },
+  async (input, flow) => {
+    await verifyAdmin(flow);
+    const db = getFirestore();
+    const applicationRef = db.doc(`contributorApplications/${input.applicationId}`);
+    
+    const applicationDoc = await applicationRef.get();
+    if (!applicationDoc.exists) {
+      throw new Error('Application not found.');
+    }
+    
+    if (input.status === 'rejected') {
+      // If rejected, refund the deposit to the user's available balance.
+      const appData = applicationDoc.data();
+      const userId = appData?.userId;
+      const depositAmount = appData?.depositAmount;
+      if (userId && depositAmount) {
+        const userStatsRef = db.doc(`userStats/${userId}`);
+        await userStatsRef.update({
+          availableBalance: FieldValue.increment(depositAmount),
+        });
+      }
+    }
+    
+    await applicationRef.update({ status: input.status });
     return { success: true };
   }
 );

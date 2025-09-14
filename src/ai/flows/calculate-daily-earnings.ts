@@ -10,22 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore, FieldValue, WriteBatch } from 'firebase-admin/firestore';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
-
-// Initialize Firebase Admin SDK
-if (!getApps().length) {
-  if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
-    console.error("FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
-  } else {
-    try {
-      initializeApp({
-        credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG))
-      });
-    } catch (e: any) {
-      console.error("Admin SDK initialization failed:", e.message);
-    }
-  }
-}
+import { getApps } from 'firebase-admin/app';
 
 const CalculateEarningsOutputSchema = z.object({
     success: z.boolean(),
@@ -54,7 +39,7 @@ async function commitBatchInChunks(db: FirebaseFirestore.Firestore, docsToUpdate
 
 async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
     if (!getApps().length) {
-        throw new Error("Admin SDK is not configured. Check server environment variables.");
+        throw new Error("Admin SDK is not configured. The user management flow must be initialized first.");
     }
     console.log("Starting daily earnings calculation...");
     

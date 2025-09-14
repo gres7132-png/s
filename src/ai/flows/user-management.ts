@@ -3,7 +3,8 @@
 
 /**
  * @fileOverview User management flows for administrators.
- * IMPORTANT: This file now contains the production-ready implementation for user management.
+ * This file is the central point for Firebase Admin SDK initialization.
+ * All administrative flows are secured here.
  */
 
 import { ai } from '@/ai/genkit';
@@ -12,19 +13,39 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 
+// Centralized Firebase Admin SDK Initialization
 if (!getApps().length) {
   if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
-    console.error("FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
+    console.error("CRITICAL: FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
   } else {
     try {
       initializeApp({
         credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG))
       });
+      console.log("Firebase Admin SDK initialized successfully.");
     } catch (e: any) {
-      console.error("Admin SDK initialization failed:", e.message);
+      console.error("CRITICAL: Admin SDK initialization failed:", e.message);
     }
   }
 }
+
+// --- Central Admin Verification Helper ---
+export async function verifyAdmin(flow: any) {
+    if (!getApps().length) {
+        throw new Error("Admin SDK is not configured. Check server environment variables.");
+    }
+    if (!flow.auth) {
+        throw new Error("Authentication is required.");
+    }
+    const auth = getAuth();
+    const user = await auth.getUser(flow.auth.uid);
+    // This list MUST be kept in sync with the one in `src/hooks/use-auth.tsx`
+    const ADMIN_EMAILS = ["gres7132@gmail.com"]; 
+    if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
+        throw new Error("You do not have permission to perform this action.");
+    }
+}
+
 
 // Schema for a single user's data returned by the list flow
 export const UserDataSchema = z.object({
@@ -69,38 +90,49 @@ type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSch
 
 
 /**
- * Lists all users. This implementation uses the Firebase Admin SDK.
+ * SECURED: Lists all users. Only callable by an admin.
  * @returns {Promise<ListUsersOutput>} A list of user data.
  */
-export async function listAllUsers(): Promise<ListUsersOutput> {
-  if (!getApps().length) {
-    throw new Error("Admin SDK is not configured. Please check server environment variables.");
+export const listAllUsers = ai.defineFlow(
+  {
+    name: 'listAllUsersFlow',
+    outputSchema: ListUsersOutputSchema,
+    auth: { user: true }
+  },
+  async (_, flow) => {
+    await verifyAdmin(flow);
+    const auth = getAuth();
+    const userRecords = await auth.listUsers();
+    const users = userRecords.users.map(user => ({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      disabled: user.disabled,
+    }));
+    return { users };
   }
-  const auth = getAuth();
-  const userRecords = await auth.listUsers();
-  const users = userRecords.users.map(user => ({
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName,
-    disabled: user.disabled,
-  }));
-  return { users };
-}
+);
 
 
 /**
- * Updates the disabled status of a user using the Firebase Admin SDK.
+ * SECURED: Updates the disabled status of a user. Only callable by an admin.
  * @param {UpdateUserStatusInput} input The user's UID and new status.
  * @returns {Promise<{success: boolean}>} A success flag.
  */
-export async function updateUserStatus(input: UpdateUserStatusInput): Promise<{success: boolean}> {
-    if (!getApps().length) {
-      throw new Error("Admin SDK is not configured. Please check server environment variables.");
+export const updateUserStatus = ai.defineFlow(
+    {
+        name: 'updateUserStatusFlow',
+        inputSchema: UpdateUserStatusInputSchema,
+        outputSchema: z.object({ success: z.boolean() }),
+        auth: { user: true }
+    },
+    async (input, flow) => {
+        await verifyAdmin(flow);
+        const auth = getAuth();
+        await auth.updateUser(input.uid, { disabled: input.disabled });
+        return { success: true };
     }
-    const auth = getAuth();
-    await auth.updateUser(input.uid, { disabled: input.disabled });
-    return { success: true };
-}
+);
 
 /**
  * Processes a referral commission when a new investment is made.
@@ -247,17 +279,3 @@ export const applyForContributorTier = ai.defineFlow(
     return { success: true, applicationId };
   }
 );
-
-
-
-// Define the Genkit flows
-ai.defineFlow({
-    name: 'listAllUsersFlow',
-    outputSchema: ListUsersOutputSchema,
-}, listAllUsers);
-
-ai.defineFlow({
-    name: 'updateUserStatusFlow',
-    inputSchema: UpdateUserStatusInputSchema,
-    outputSchema: z.object({ success: z.boolean() }),
-}, updateUserStatus);

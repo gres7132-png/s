@@ -56,7 +56,9 @@ export default function UsersListPage() {
         }
     };
 
-    fetchUsers();
+    if(isAdmin) {
+      fetchUsers();
+    }
   }, [isAdmin, toast]);
 
   if (authLoading) {

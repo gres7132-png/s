@@ -125,6 +125,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
   const investmentForm = useForm<InvestmentFormValues>({ resolver: zodResolver(investmentSchema) });
 
   const fetchUserData = useCallback(async () => {
+    if (!isAdmin) return;
     setLoading(true);
     try {
         const { users } = await listAllUsers();
@@ -139,7 +140,7 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
     } finally {
         setLoading(false);
     }
-  }, [userId, toast]);
+  }, [userId, toast, isAdmin]);
 
   useEffect(() => {
     if (!isAdmin || !userId) return;
@@ -192,9 +193,9 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
             title: `User ${newStatus ? 'Suspended' : 'Reactivated'}`,
             description: `${user.displayName || user.email} has been ${newStatus ? 'suspended' : 'reactivated'}.`
         });
-    } catch (error) {
-        toast({ variant: "destructive", title: "Action Failed" });
-        setUser(prev => prev ? {...prev, disabled: !newStatus } : null);
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Action Failed", description: error.message });
+        setUser(prev => prev ? {...prev, disabled: !newStatus } : null); // Revert on error
     } finally {
         setActionLoading(false);
     }
