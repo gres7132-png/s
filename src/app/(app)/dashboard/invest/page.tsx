@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import {
@@ -62,8 +61,8 @@ export default function InvestPage() {
       await investPackage({ packageId: pkg.id });
 
       toast({
-          title: "Investment Successful!",
-          description: `You have invested in ${pkg.name}.`,
+        title: "Investment Successful!",
+        description: `You have invested in ${pkg.name}.`,
       });
 
     } catch (error: any) {

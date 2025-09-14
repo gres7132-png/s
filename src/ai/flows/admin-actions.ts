@@ -21,7 +21,7 @@ async function syncHasActiveInvestment(db: FirebaseFirestore.Firestore, userId: 
     const activeInvestmentsSnapshot = await investmentsColRef.where('status', '==', 'active').limit(1).get();
     const hasActive = !activeInvestmentsSnapshot.empty;
     
-    await userRef.update({ hasActiveInvestment: hasActive });
+    await userRef.set({ hasActiveInvestment: hasActive }, { merge: true });
     console.log(`User ${userId} hasActiveInvestment status set to ${hasActive}.`);
 }
 

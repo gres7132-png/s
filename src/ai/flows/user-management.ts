@@ -54,11 +54,6 @@ export const UpdateUserStatusInputSchema = z.object({
 });
 export type UpdateUserStatusInput = z.infer<typeof UpdateUserStatusInputSchema>;
 
-export const ProcessReferralInputSchema = z.object({
-  investorId: z.string().describe("The UID of the user making the investment."),
-  investmentAmount: z.number().positive().describe("The amount of the investment."),
-});
-export type ProcessReferralInput = z.infer<typeof ProcessReferralInputSchema>;
 
 const WithdrawalRequestInputSchema = z.object({
   amount: z.number().min(1000, "Minimum withdrawal is KES 1,000."),
@@ -114,31 +109,19 @@ const updateUserStatusFlow = ai.defineFlow(
     }
 );
 
-/**
- * Wrapper for processReferralFlow.
- */
-export async function processReferral(input: ProcessReferralInput): Promise<{success: boolean, commissionAwarded: number}> {
-    return processReferralFlow(input);
-}
 
 /**
  * Processes a referral commission when a new investment is made.
- * @param {ProcessReferralInput} input The investor's UID and investment amount.
+ * This is now an internal function called by investPackageFlow.
+ * @param {object} params The investor's UID and investment amount.
  * @returns {Promise<{success: boolean, commissionAwarded: number}>} A success flag and the commission amount.
  */
-const processReferralFlow = ai.defineFlow(
-  {
-    name: 'processReferralFlow',
-    inputSchema: ProcessReferralInputSchema,
-    outputSchema: z.object({ success: z.boolean(), commissionAwarded: z.number() }),
-    auth: { user: true }
-  },
-  async ({ investorId, investmentAmount }) => {
+async function processReferral({ investorId, investmentAmount }: { investorId: string, investmentAmount: number }): Promise<{success: boolean, commissionAwarded: number}> {
     const db = getFirestore();
     const investorDocRef = db.doc(`users/${investorId}`);
     
     const investorDoc = await investorDocRef.get();
-    if (!investorDoc.exists) {
+    if (!investorDoc.exists()) {
       console.log(`Investor ${investorId} not found. No referral to process.`);
       return { success: true, commissionAwarded: 0 };
     }
@@ -155,9 +138,16 @@ const processReferralFlow = ai.defineFlow(
     const referrerStatsRef = db.doc(`userStats/${referrerId}`);
     
     try {
-      await referrerStatsRef.set({
-        availableBalance: FieldValue.increment(commissionAmount)
-      }, { merge: true });
+        const referrerStatsDoc = await referrerStatsRef.get();
+        if (referrerStatsDoc.exists()) {
+            await referrerStatsRef.update({
+                availableBalance: FieldValue.increment(commissionAmount)
+            });
+        } else {
+             await referrerStatsRef.set({
+                availableBalance: commissionAmount
+            }, { merge: true });
+        }
       console.log(`Awarded ${commissionAmount} commission to referrer ${referrerId}.`);
       return { success: true, commissionAwarded: commissionAmount };
     } catch (error) {
@@ -165,8 +155,7 @@ const processReferralFlow = ai.defineFlow(
        // We don't re-throw here to ensure the main investment isn't rolled back if this fails.
        return { success: false, commissionAwarded: 0 };
     }
-  }
-);
+}
 
 
 /**

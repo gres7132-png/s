@@ -11,7 +11,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, writeBatch, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
 
 
 import { Button } from "@/components/ui/button";
@@ -136,9 +136,6 @@ export function AuthForm() {
         withdrawalAmount: 0,
       });
       
-      // The old logic for creating a subcollection on the referrer's doc is inefficient.
-      // The `referredBy` field on the new user's doc is now the source of truth.
-
       await batch.commit();
 
       toast({
