@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { sendAdminNotification } from '@/ai/utils/email';
 
 // Centralized Firebase Admin SDK Initialization
 if (!getApps().length) {
@@ -64,6 +65,13 @@ const WithdrawalRequestInputSchema = z.object({
   paymentDetails: z.any().describe("The user's saved payment details object."),
 });
 type WithdrawalRequestInput = z.infer<typeof WithdrawalRequestInputSchema>;
+
+const DepositProofInputSchema = z.object({
+  amount: z.number().positive("Amount must be a positive number."),
+  transactionProof: z.string().min(10, "Please enter a valid transaction ID or hash."),
+});
+type DepositProofInput = z.infer<typeof DepositProofInputSchema>;
+
 
 const ContributorApplicationInputSchema = z.object({
   tierId: z.string().describe("The ID of the contributor tier being applied for."),
@@ -175,7 +183,6 @@ const requestWithdrawalFlow = ai.defineFlow(
   async ({ amount, paymentDetails }, { auth }) => {
     if (!auth) throw new Error("Authentication required.");
     const userId = auth.uid;
-
     const db = getFirestore();
     const userStatsRef = db.doc(`userStats/${userId}`);
     const requestsColRef = db.collection("withdrawalRequests");
@@ -193,8 +200,6 @@ const requestWithdrawalFlow = ai.defineFlow(
         throw new Error(`Insufficient funds. Your balance is KES ${currentBalance}, but you requested KES ${amount}.`);
       }
 
-      // Important: We do NOT deduct the balance here. Balance is only deducted upon admin approval.
-      // We just create the request.
       const newRequestRef = requestsColRef.doc();
       transaction.set(newRequestRef, {
         userId: userId,
@@ -206,9 +211,59 @@ const requestWithdrawalFlow = ai.defineFlow(
       requestId = newRequestRef.id;
     });
 
+    // After successfully creating the request, send an email notification.
+    await sendAdminNotification({
+      subject: 'New Withdrawal Request',
+      text: `A new withdrawal request for KES ${amount} from user ${userId} is pending your approval.`,
+      html: `<p>A new withdrawal request for <strong>KES ${amount}</strong> from user ${userId} is pending your approval.</p><p>Please log in to the admin panel to review it.</p>`,
+    });
+
     return { success: true, requestId };
   }
 );
+
+/**
+ * Wrapper for submitDepositProofFlow
+ */
+export async function submitDepositProof(input: DepositProofInput): Promise<{ success: boolean, proofId: string }> {
+  return submitDepositProofFlow(input);
+}
+
+/**
+ * Creates a deposit proof and sends an admin notification.
+ */
+const submitDepositProofFlow = ai.defineFlow(
+  {
+    name: 'submitDepositProofFlow',
+    inputSchema: DepositProofInputSchema,
+    outputSchema: z.object({ success: z.boolean(), proofId: z.string() }),
+    auth: { user: true, admin: true }
+  },
+  async ({ amount, transactionProof }, { auth }) => {
+    if (!auth) throw new Error("Authentication required.");
+    const userId = auth.uid;
+    const db = getFirestore();
+    const proofsColRef = db.collection("transactionProofs");
+
+    const newProof = await proofsColRef.add({
+        userId: userId,
+        amount: amount,
+        proof: transactionProof,
+        submittedAt: Timestamp.now(),
+        status: 'pending',
+    });
+
+    // After successfully creating the proof, send an email notification.
+    await sendAdminNotification({
+      subject: 'New Deposit Proof Submitted',
+      text: `A new deposit proof for KES ${amount} from user ${userId} is pending your verification.`,
+      html: `<p>A new deposit proof for <strong>KES ${amount}</strong> from user ${userId} is pending your verification.</p><p>Proof/ID: ${transactionProof}</p><p>Please log in to the admin panel to review it.</p>`,
+    });
+
+    return { success: true, proofId: newProof.id };
+  }
+);
+
 
 /**
  * Wrapper for applyForContributorTierFlow
@@ -219,7 +274,6 @@ export async function applyForContributorTier(input: ContributorApplicationInput
 
 /**
  * Processes an application for a contributor tier.
- * Deducts the deposit from the user's balance and creates an application record.
  */
 const applyForContributorTierFlow = ai.defineFlow(
   {

@@ -40,8 +40,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
-import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { requestWithdrawal } from "@/ai/flows/user-management";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { requestWithdrawal, submitDepositProof } from "@/ai/flows/user-management";
 import { useSearchParams } from "next/navigation";
 
 const depositSchema = z.object({
@@ -215,12 +215,9 @@ export default function WalletPage() {
     
     setIsSubmittingProof(true);
     try {
-        await addDoc(collection(db, "transactionProofs"), {
-            userId: user.uid,
+        await submitDepositProof({
             amount: values.amount,
-            proof: values.transactionProof,
-            submittedAt: serverTimestamp(),
-            status: 'pending',
+            transactionProof: values.transactionProof,
         });
 
         toast({
@@ -228,12 +225,12 @@ export default function WalletPage() {
           description: "Your deposit is being verified and will reflect in your account shortly.",
         });
         depositForm.reset();
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error submitting proof:", error);
         toast({
             variant: "destructive",
             title: "Submission Failed",
-            description: "Could not submit your proof. Please try again.",
+            description: error.message || "Could not submit your proof. Please try again.",
         });
     } finally {
         setIsSubmittingProof(false);
@@ -553,4 +550,3 @@ export default function WalletPage() {
     </div>
   );
 }
-
