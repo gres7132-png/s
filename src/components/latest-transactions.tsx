@@ -12,106 +12,66 @@ import { formatCurrency } from "@/lib/utils";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc, getDoc, where } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
-import { useAuth } from "@/hooks/use-auth";
 
-interface Transaction {
+// --- Automated Bot Transaction Data ---
+const firstNames = ["James", "John", "David", "Chris", "Mike", "Daniel", "Mark", "Paul", "Kevin", "Brian", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Susan", "Jessica", "Sarah", "Karen", "Nancy"];
+const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula"];
+const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
+
+interface BotTransaction {
     id: string;
     type: 'Deposit' | 'Withdrawal';
-    userId: string;
+    userName: string;
     amount: number;
-    timestamp: Timestamp;
+    timestamp: Date;
 }
 
-interface UserDisplayInfo {
-    displayName?: string;
-}
+const generateRandomTransaction = (): BotTransaction => {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const type = transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
+    
+    // Generate more realistic amounts
+    let amount;
+    if (type === 'Deposit') {
+        amount = Math.floor(Math.random() * (20000 - 3000 + 1) + 3000);
+    } else { // Withdrawals are typically larger
+        amount = Math.floor(Math.random() * (50000 - 5000 + 1) + 5000);
+    }
+     // Round to nearest 100 for cleaner numbers
+    amount = Math.round(amount / 100) * 100;
+
+    return {
+        id: new Date().getTime().toString() + Math.random(), // Unique ID
+        type: type,
+        userName: `${firstName} ${lastName.charAt(0)}.`,
+        amount: amount,
+        timestamp: new Date(),
+    };
+};
+
 
 export default function LatestTransactions() {
-  const { user } = useAuth(); // We still need user to know when to start fetching
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [userCache, setUserCache] = useState<Record<string, UserDisplayInfo>>({});
+  const [transactions, setTransactions] = useState<BotTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserDetails = useCallback(async (userId: string) => {
-    if (userCache[userId]) {
-        return;
-    }
-    try {
-        const userDocRef = doc(db, "users", userId);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-            const userData = {
-                displayName: userDoc.data().displayName,
-            };
-            setUserCache(prev => ({...prev, [userId]: userData}));
-        }
-    } catch (error) {
-        console.error("Failed to fetch user details for cache:", error);
-    }
-  }, [userCache]);
-
-
   useEffect(() => {
-    if (!user) return;
+    // Generate initial set of transactions
+    const initialTransactions = Array.from({ length: 5 }, generateRandomTransaction).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
+    setTransactions(initialTransactions);
+    setLoading(false);
 
-    setLoading(true);
-    
-    const depositsQuery = query(
-        collection(db, "transactionProofs"), 
-        where("status", "==", "approved"),
-        orderBy("submittedAt", "desc"), 
-        limit(5)
-    );
-    const withdrawalsQuery = query(
-        collection(db, "withdrawalRequests"), 
-        where("status", "==", "approved"),
-        orderBy("requestedAt", "desc"), 
-        limit(5)
-    );
+    // Set up an interval to add new transactions
+    const interval = setInterval(() => {
+      const newTx = generateRandomTransaction();
+      setTransactions(prev => 
+        [newTx, ...prev].slice(0, 7) // Keep the list size manageable
+      );
+    }, 5000); // Add a new transaction every 5 seconds
 
-    const processSnapshot = (snapshot: any, type: 'Deposit' | 'Withdrawal') => {
-        snapshot.docChanges().forEach((change: any) => {
-            if (change.type === "added" || change.type === "modified") {
-                const data = change.doc.data();
-                if (data.userId) fetchUserDetails(data.userId);
-
-                const newTx: Transaction = {
-                    id: `${type.toLowerCase()}-${change.doc.id}`,
-                    type: type,
-                    userId: data.userId,
-                    amount: data.amount || 0,
-                    timestamp: type === 'Deposit' ? data.submittedAt : data.requestedAt
-                };
-                 // Add or update the transaction, then sort and slice.
-                 setTransactions(prev => {
-                    const filtered = prev.filter(tx => tx.id !== newTx.id);
-                    return [...filtered, newTx]
-                        .sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis())
-                        .slice(0, 5);
-                 });
-            }
-        });
-        setLoading(false);
-    };
-
-    const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => processSnapshot(snapshot, 'Deposit'), (err) => {
-        console.error("Deposits subscription error:", err);
-        setLoading(false);
-    });
-    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => processSnapshot(snapshot, 'Withdrawal'), (err) => {
-        console.error("Withdrawals subscription error:", err);
-        setLoading(false);
-    });
-    
-    return () => {
-        unsubDeposits();
-        unsubWithdrawals();
-    };
-
-  }, [user, fetchUserDetails]);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Card>
@@ -148,8 +108,8 @@ export default function LatestTransactions() {
                 )}
               </div>
               <div className="flex-grow">
-                <p className="font-medium">{tx.type} by {userCache[tx.userId]?.displayName || 'a user'}</p>
-                <p className="text-sm text-muted-foreground">{tx.timestamp ? formatDistanceToNow(tx.timestamp.toDate(), { addSuffix: true }) : 'Just now'}</p>
+                <p className="font-medium">{tx.type} by {tx.userName}</p>
+                <p className="text-sm text-muted-foreground">{formatDistanceToNow(tx.timestamp, { addSuffix: true })}</p>
               </div>
               <div className="font-bold text-right">
                 {formatCurrency(tx.amount)}
