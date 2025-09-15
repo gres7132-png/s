@@ -15,10 +15,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 
 // --- Automated Bot Transaction Data ---
-// Expanded and more authentic list of Kenyan names
-const firstNames = ["Abdi", "Achieng", "Adhiambo", "Ali", "Ann", "Anthony", "Anyango", "Atieno", "Baraka", "Brenda", "Brian", "Charles", "Chebet", "Chege", "Chepkoech", "Cherono", "Cheruiyot", "Collins", "Cynthia", "Daniel", "David", "Dennis", "Dorothy", "Elizabeth", "Esther", "Faith", "Fatuma", "Felix", "Grace", "Halima", "Ian", "Imani", "Irene", "Jackline", "Jacob", "James", "Jane", "Janet", "Jennifer", "Jepchumba", "Jerop", "Jessica", "John", "Joseph", "Joshua", "Juma", "Justus", "Kamau", "Karen", "Kariuki", "Kavindu", "Kelvin", "Ken", "Kennedy", "Kevin", "Kibet", "Kimani", "Kipchoge", "Kipkorir", "Kiplagat", "Kiprotich", "Kipruto", "Kiptoo", "Lilian", "Linda", "Lisa", "Lucy", "Lydia", "Maina", "Mark", "Martha", "Mary", "Matthew", "Maureen", "Mercy", "Michael", "Michelle", "Mike", "Mohamed", "Moses", "Mbugua", "Mugo", "Mumbi", "Murage", "Muriithi", "Murithi", "Musyoka", "Mutai", "Muthee", "Muthoni", "Mutinda", "Mutiso", "Mutua", "Mwangi", "Mwikali", "Nancy", "Naomi", "Ndegwa", "Nderitu", "Ndungu", "Nekesa", "Nelson", "Njeru", "Njeri", "Njogu", "Njoroge", "Njuguna", "Nthenya", "Nyaboke", "Nyaga", "Nyambura", "Nyamu", "Nzambi", "Ochieng", "Odhiambo", "Oduor", "Okello", "Okoth", "Okumu", "Oloo", "Omar", "Omondi", "Onyango", "Otieno", "Patricia", "Patrick", "Paul", "Peter", "Purity", "Rachel", "Rebecca", "Richard", "Robert", "Rose", "Ruth", "Said", "Samuel", "Sandra", "Sarah", "Sharon", "Sheila", "Simiyu", "Simon", "Stacy", "Stanley", "Stephen", "Susan", "Thomas", "Timothy", "Titus", "Victor", "Victoria", "Vincent", "Vivian", "Wachira", "Wafula", "Wairimu", "Waititu", "Wamalwa", "Wambua", "Wambui", "Wanjala", "Wanjiku", "Wanjiru", "Waweru", "Wilfred", "William", "Wycliffe", "Yusuf", "Zainabu", "Zipporah"];
 
-const lastNames = ["Abdullahi", "Achieng", "Adhiambo", "Ali", "Anyango", "Atieno", "Barasa", "Chebet", "Chege", "Chepkoech", "Cherono", "Cheruiyot", "Gacheru", "Gichuhi", "Gikonyo", "Githinji", "Gitonga", "Hassan", "Ibrahim", "Juma", "Kagwe", "Kamau", "Karanja", "Kariuki", "Kasandi", "Kavulavu", "Kibet", "Kimani", "Kimanthi", "Kimutai", "Kinyua", "Kioko", "Kipchumba", "Kipkemboi", "Kipkoech", "Kipkorir", "Kiplagat", "Kiprotich", "Kipruto", "Langat", "Leting", "Maingi", "Maina", "Makokha", "Masinde", "Matasi", "Mbatha", "Mbugua", "Mogaka", "Mohamed", "Mokua", "Muchiri", "Mugo", "Muiruri", "Munyao", "Murage", "Muriithi", "Murithi", "Musyoka", "Mutai", "Muthee", "Muthoni", "Mutiso", "Mutua", "Mwangi", "Mwanza", "Mwendwa", "Naliaka", "Ndambuki", "Ndegwa", "Nderitu", "Ndichu", "Ndungu", "Njeru", "Njeri", "Njogu", "Njoroge", "Njuguna", "Nyaboke", "Nyaga", "Nyambura", "Nyamu", "Nzioka", "Obara", "Obonyo", "Ochieng", "Odhiambo", "Oduor", "Ogutu", "Okello", "Okeyo", "Okoth", "Okumu", "Oloo", "Omar", "Omondi", "Onsongo", "Onyango", "Opio", "Otieno", "Ouma", "Rotich", "Simiyu", "Wachira", "Wafula", "Wairimu", "Waititu", "Wamalwa", "Wambua", "Wambui", "Wanjala", "Wanjiku", "Wanjiru", "Waweru", "Were"];
+// A more structured and culturally aware approach to name generation.
+// We pair common Christian/English names with vernacular surnames from major communities.
+const christianNames = ["Abigael","Abraham","Adam","Adrian","Agnes","Albert","Alex","Alexander","Alice","Alicia","Alvin","Amina","Amos","Anderson","Andrew","Angela","Ann","Anna","Anne","Anthony","Arnold","Ashley","Asher","Austin","Barbra","Beatrice","Ben","Benjamin","Benson","Bernard","Bertha","Betty","Bonface","Brenda","Brian","Bridget","Brighton","Bruce","Calvin","Carl","Caroline","Catherine","Caleb","Cecilia","Charles","Charity","Charlotte","Chris","Christian","Christine","Christopher","Claire","Clara","Clare","Clement","Collins","Colman","Cynthia","Daisy","Damaris","Daniel","David","Davies","Debora","Denis","Dennis","Derick","Diana","Donald","Doreen","Doris","Dorothy","Douglas","Duncan","Dylan","Edgar","Edith","Edmond","Edna","Edu","Edward","Edwin","Elia","Elias","Elijah","Elikanah","Elizabeth","Elsa","Elsie","Elvis","Emmanuel","Erick","Eric","Ernest","Esther","Eunice","Eva","Evans","Everlyne","Faith","Fatuma","Felix","Ferdinand","Festus","Fidel","Florence","Francis","Frank","Fred","Frederick","Geoffrey","George","Getrude","Gideon","Gilbert","Gladwell","Gladys","Gloria","Godfrey","Grace","Habiba","Halima","Hellen","Henry","Hilda","Hillary","Hope","Hussein","Ian","Ibrahim","Immanuel","Irene","Isaac","Ismael","Israel","Ivan","Ivy","Jack","Jackline","Jackson","Jacob","James","Jane","Janet","Jason","Jeff","Jennifer","Jeremiah","Jeremy","Jerry","Jessica","Joan","Joash","Joel","John","Jona","Jonathan","Joseph","Josephine","Joshua","Joy","Joyce","Jude","Judith","Juliana","Juliet","Julius","Junior","Justin","Justus","Karen","Kate","Kelvin","Ken","Kennedy","Kenneth","Kevin","Laura","Lauren","Lawrence","Leah","Lilian","Linda","Lisa","Lorna","Louis","Lucas","Lucy","Lydia","Lynette","Magdalene","Margaret","Mark","Martha","Martin","Mary","Mathew","Maureen","Maurice","Maxwell","Melvin","Mercy","Michael","Michelle","Mike","Mildred","Milicent","Miriam","Mitchelle","Mohammed","Morris","Moses","Muriam","Nancy","Naomi","Nathan","Nelson","Nelly","Newton","Nicholas","Nickson","Noah","Noel","Norah","Norman","Oliver","Olivia","Oscar","Owen","Pamela","Pascal","Patricia","Patrick","Paul","Pauline","Peter","Philip","Phylis","Purity","Rachael","Rachel","Ralph","Randolph","Raphael","Raymond","Reagan","Rebecca","Regina","Reuben","Rhoda","Richard","Rita","Robert","Robbin","Rodgers","Ronald","Ronny","Rose","Rosemary","Roy","Ruth","Sabina","Said","Salim","Sam","Sammy","Samuel","Sandra","Sarah","Saumu","Sharon","Shaun","Sheila","Shirley","Sidney","Silas","Simon","Solomon","Sophia","Stacy","Stanley","Stella","Stephen","Steve","Steven","Susan","Sylus","Sylvia","Teresa","Thomas","Timothy","Titus","Tobias","Tom","Tony","Tracy","Valentine","Valerie","Venessa","Vero","Veronica","Victor","Victoria","Vincent","Viola","Violet","Virginia","Vivian","Walter","Wendy","Wilfred","Wilkister","William","Willy","Wilson","Winnie","Wycliff","Yvonne","Yvone","Zachariah","Zainab","Zipporah"];
+const surnamesByCommunity = {
+    kikuyu: ["Mbugua", "Njogu", "Kamau", "Njoroge", "Maina", "Mwangi", "Kariuki", "Gitau", "Ng'ang'a", "Wanjiru", "Wambui", "Njeri", "Wanjiku", "Waithera", "Nyambura", "Wairimu", "Muthoni", "Wangari", "Wangui"],
+    luhya: ["Wamalwa", "Wafula", "Simiyu", "Nekesa", "Wanyonyi", "Khisa", "Juma", "Nasimiyu", "Wangila", "Masinde", "Barasa", "Situma", "Wekesa", "Nafula"],
+    kalenjin: ["Kiprotich", "Chebet", "Kipkoech", "Cherono", "Kipkirui", "Chepkoech", "Kipkemboi", "Jepkemboi", "Kipruto", "Jepchirchir", "Kibet", "Cheptoo", "Koech", "Jepkosgei", "Kiptoo", "Jebet"],
+    luo: ["Ochieng'", "Achieng'", "Otieno", "Atieno", "Onyango", "Anyango", "Okoth", "Akoth", "Ouma", "Auma", "Owino", "Awino", "Omondi", "Amondi", "Okinyi", "Akinyi"],
+    kamba: ["Mutua", "Musyoka", "Nthenya", "Muthama", "Mutuku", "Mwikali", "Kyalo", "Mwende", "Mutisya", "Nduku", "Kioko", "Wayua", "Wambua", "Syombua"],
+    kisii: ["Ondieki", "Nyaboke", "Mogaka", "Kwamboka", "Nyamweya", "Kerubo", "Osoro", "Moraa", "Ombasa", "Bwari", "Gichana", "Kemunto"],
+    meru: ["Murithi", "Muthomi", "Kendi", "Kinoti", "Nkatha", "Kimathi", "Makena", "Muriuki", "Karimi", "Mugambi", "Kinya"],
+    maasai: ["Ole Tipis", "Naserian", "Ole Metu", "Naisiae", "Ole Ntimama", "Naneu", "Lekakeny", "Simantoi"],
+    mijikenda: ["Mdigo", "Wanje", "Chai", "Mbeyu", "Tsuma", "Kwekwe", "Kenga", "Dama"],
+    somali: ["Hassan", "Ali", "Abdi", "Fatuma", "Ibrahim", "Amina", "Mohamed", "Halima", "Hussein", "Asha"]
+};
 
 
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
@@ -44,8 +56,14 @@ const generateRandomString = (length: number) => {
 }
 
 const generateRandomTransaction = (): BotTransaction => {
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    // Generate a realistic Kenyan name
+    const communityKeys = Object.keys(surnamesByCommunity);
+    const randomCommunityKey = communityKeys[Math.floor(Math.random() * communityKeys.length)];
+    const surnames = surnamesByCommunity[randomCommunityKey as keyof typeof surnamesByCommunity];
+
+    const firstName = christianNames[Math.floor(Math.random() * christianNames.length)];
+    const lastName = surnames[Math.floor(Math.random() * surnames.length)];
+
     const type = transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
     const modeOfPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
     
@@ -157,3 +175,4 @@ export default function LatestTransactions() {
   );
 }
 
+    
