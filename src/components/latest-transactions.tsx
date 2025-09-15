@@ -34,7 +34,7 @@ const surnamesByCommunity = {
 
 
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
-const paymentMethods = ["M-PESA", "M-PESA", "M-PESA", "M-PESA", "Bank Transfer"];
+const paymentMethods = ["M-PESA", "M-PESA", "M-PESA", "M-PESA", "Bank Transfer", "M-PESA"];
 
 interface BotTransaction {
     id: string;
@@ -76,7 +76,7 @@ const generateRandomTransaction = (): BotTransaction => {
     // Make the amount a round number, which is more realistic
     amount = Math.round(amount / 100) * 100;
 
-    const fullCode = generateRandomString(10);
+    const fullCode = 'TI' + generateRandomString(8);
     // Mask the transaction code for realism and security feel
     const transactionCode = `${fullCode.substring(0, 3)}...${fullCode.substring(7)}`;
 
