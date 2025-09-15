@@ -42,7 +42,7 @@ const getReferralDataFlow = ai.defineFlow(
     outputSchema: ReferralDataSchema,
     auth: { user: true }
   },
-  async (_, { auth }) => {
+  async (input, { auth }) => {
     if (!auth) {
         throw new Error("Authentication is required.");
     }
