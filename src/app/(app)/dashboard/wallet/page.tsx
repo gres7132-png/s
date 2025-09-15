@@ -102,6 +102,12 @@ export default function WalletPage() {
     resolver: zodResolver(bankingDetailsSchema),
     defaultValues: {
       paymentMethod: "mobile",
+      mobileNumber: "",
+      minipayNumber: "",
+      cryptoAddress: "",
+      bankName: "",
+      bankAccountName: "",
+      bankAccountNumber: "",
     },
   });
   

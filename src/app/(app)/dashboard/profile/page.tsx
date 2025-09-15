@@ -33,7 +33,7 @@ import { updateProfile, verifyBeforeUpdateEmail } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -74,7 +74,7 @@ export default function ProfilePage() {
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { firstName: "", lastName: "", email: "", bio: "" },
+    defaultValues: { firstName: "", lastName: "", email: "", bio: "", phoneNumber: "", age: 0, birthYear: 0 },
   });
   
   const emailForm = useForm<EmailFormValues>({
@@ -92,8 +92,8 @@ export default function ProfilePage() {
           lastName: data?.lastName || "",
           email: user.email || "",
           phoneNumber: data?.phoneNumber || "",
-          age: data?.age,
-          birthYear: data?.birthYear,
+          age: data?.age || undefined,
+          birthYear: data?.birthYear || undefined,
           bio: data?.bio || "",
         });
         emailForm.reset({
@@ -306,8 +306,9 @@ export default function ProfilePage() {
             <CardContent>
                  <Alert>
                     <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Centralized Management</AlertTitle>
                     <AlertDescription>
-                        To ensure security and prevent confusion, all payment details are now managed in one place.
+                        To ensure security and prevent confusion, all payment details are now managed in the <Link href="/dashboard/wallet?tab=banking" className="font-bold underline">Withdraw/Deposit</Link> section.
                     </AlertDescription>
                 </Alert>
             </CardContent>
