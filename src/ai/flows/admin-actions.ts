@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -158,28 +159,30 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
     }
     
     await db.runTransaction(async (transaction) => {
-      if (input.status === 'rejected') {
-        // If rejected, refund the deposit to the user's available balance.
-        const appData = applicationDoc.data();
-        const userId = appData?.userId;
-        const depositAmount = appData?.depositAmount;
-
-        if (userId && depositAmount > 0) {
-          const userStatsRef = db.doc(`userStats/${userId}`);
-          // We must read the doc first in a transaction before writing.
-          const userStatsDoc = await transaction.get(userStatsRef); 
-          if(userStatsDoc.exists()) {
-             transaction.update(userStatsRef, {
-                availableBalance: FieldValue.increment(depositAmount),
-             });
-          } else {
-             // This case is unlikely but handled for safety.
-             transaction.set(userStatsRef, {
-                availableBalance: depositAmount,
-             });
-          }
+      // READ must come first in a transaction
+      const appData = applicationDoc.data();
+      const userId = appData?.userId;
+      const depositAmount = appData?.depositAmount;
+      
+      if (input.status === 'rejected' && userId && depositAmount > 0) {
+        // If rejected, refund the deposit.
+        const userStatsRef = db.doc(`userStats/${userId}`);
+        const userStatsDoc = await transaction.get(userStatsRef); // READ the user's stats
+        
+        if (userStatsDoc.exists()) {
+           // WRITE after the read
+           transaction.update(userStatsRef, {
+              availableBalance: FieldValue.increment(depositAmount),
+           });
+        } else {
+           // This case is unlikely but handled for safety.
+           // WRITE after the read
+           transaction.set(userStatsRef, {
+              availableBalance: depositAmount,
+           }, { merge: true });
         }
       }
+      
       // Update the application status in the same transaction
       transaction.update(applicationRef, { status: input.status });
     });
