@@ -272,7 +272,7 @@ export default function ProfilePage() {
                             <FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" placeholder="e.g. 30" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                         )} />
                          <FormField control={profileForm.control} name="birthYear" render={({ field }) => (
-                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormMessage /></FormItem>
+                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                         )} />
                     </div>
                     <FormField control={profileForm.control} name="bio" render={({ field }) => (
@@ -336,4 +336,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
