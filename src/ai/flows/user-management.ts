@@ -48,7 +48,7 @@ export async function verifyAdmin(flow: any) {
 }
 
 // Input schema for updating a user's status
-export const UpdateUserStatusInputSchema = z.object({
+const UpdateUserStatusInputSchema = z.object({
   uid: z.string().describe("The UID of the user to update."),
   disabled: z.boolean().describe("The new disabled status for the user."),
 });
@@ -75,7 +75,7 @@ const ContributorApplicationInputSchema = z.object({
 });
 type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSchema>;
 
-export const InvestPackageInputSchema = z.object({
+const InvestPackageInputSchema = z.object({
     packageId: z.string().describe("The ID of the investment package to purchase."),
 });
 export type InvestPackageInput = z.infer<typeof InvestPackageInputSchema>;
