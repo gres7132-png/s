@@ -107,8 +107,7 @@ interface Investment extends InvestmentFormValues {
 }
 
 
-export default function UserDetailsPage({ params }: { params: { userId: string } }) {
-  const { userId } = params;
+export default function UserDetailsPage({ params: { userId } }: { params: { userId: string } }) {
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
   
