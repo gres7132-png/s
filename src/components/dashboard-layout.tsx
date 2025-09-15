@@ -73,7 +73,6 @@ const navItems = [
   { href: "/dashboard/distributor", icon: Gift, label: "Contributor Program" },
   { href: "/dashboard/commissions", icon: DollarSign, label: "Agent Commissions" },
   { href: "/dashboard/assistant", icon: Bot, label: "Virtual Assistant", iconClassName: "bot-icon" },
-  { href: "/dashboard/security", icon: ShieldCheck, label: "Security" },
 ];
 
 const adminNavItems = [
