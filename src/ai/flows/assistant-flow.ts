@@ -9,11 +9,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { Readable } from 'stream';
-
-const AssistantInputSchema = z.string();
-type AssistantInput = z.infer<typeof AssistantInputSchema>;
-type AssistantOutput = string;
 
 const assistantPrompt = `
 You are a friendly and helpful virtual assistant for YieldLink, a high-yield investment platform. Your goal is to answer user questions accurately based on the information provided below. Be concise and clear in your answers.
@@ -69,32 +64,12 @@ If a user asks where to perform a certain task, guide them to the correct page b
     For any issues, including challenges with the app or specific account problems, users should contact the support team via the official WhatsApp channel: https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ
 `;
 
-const assistantFlow = ai.defineFlow(
-  {
-    name: 'assistantFlow',
-    inputSchema: AssistantInputSchema,
-    outputSchema: z.string(),
-  },
-  async (query) => {
-    const { stream, response } = ai.generateStream({
-      model: 'googleai/gemini-1.5-flash-preview',
-      prompt: [
-        { role: 'system', content: assistantPrompt },
-        { role: 'user', content: query },
-      ],
-      config: { temperature: 0.3 },
-    });
 
-    let assistantResponse = '';
-    for await (const chunk of stream) {
-        assistantResponse += chunk.text;
-    }
-
-    return assistantResponse;
-  }
-);
-
-// This function will be used by the client to stream the response
+/**
+ * This function is called by the client to stream the assistant's response.
+ * It uses `ai.generateStream` to get a stream of text chunks from the AI model
+ * and pipes it into a standard ReadableStream that the browser can handle.
+ */
 export async function askAssistant(query: string) {
     const { stream } = ai.generateStream({
         model: 'googleai/gemini-1.5-flash-preview',
@@ -105,15 +80,16 @@ export async function askAssistant(query: string) {
         config: { temperature: 0.3 },
     });
 
-    // Transform the Genkit stream into a simple text stream
-    const textStream = new ReadableStream({
+    // Transform the Genkit stream into a browser-compatible ReadableStream
+    const readableStream = new ReadableStream({
         async start(controller) {
+            const encoder = new TextEncoder();
             for await (const chunk of stream) {
-                controller.enqueue(chunk.text);
+                controller.enqueue(encoder.encode(chunk.text));
             }
             controller.close();
-        }
+        },
     });
 
-    return textStream;
+    return readableStream;
 }
