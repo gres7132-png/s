@@ -194,12 +194,6 @@ export default function ProfilePage() {
                     </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                    <div className="flex items-center space-x-4">
-                        <Avatar className="h-20 w-20">
-                        <AvatarImage src={user?.photoURL ?? `https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
-                        <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
-                        </Avatar>
-                    </div>
                     <div className="grid md:grid-cols-2 gap-4">
                         <FormField control={profileForm.control} name="firstName" render={({ field }) => (
                             <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
@@ -301,5 +295,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    

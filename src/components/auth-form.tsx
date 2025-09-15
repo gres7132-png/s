@@ -198,7 +198,7 @@ export function AuthForm() {
         await sendPasswordResetEmail(auth, values.email);
         toast({
             title: "Password Reset Email Sent",
-            description: "Please check your inbox for a link to reset your password.",
+            description: "Please check your inbox for a link to reset your password, then return here to log in.",
         });
         setIsResetDialogOpen(false); // Close the dialog on success
     } catch (error: any) {
