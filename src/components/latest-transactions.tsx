@@ -9,8 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { ArrowDownCircle, ArrowUpCircle, Banknote, Landmark, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 
@@ -18,6 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 const firstNames = ["James", "John", "David", "Chris", "Mike", "Daniel", "Mark", "Paul", "Kevin", "Brian", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Susan", "Jessica", "Sarah", "Karen", "Nancy"];
 const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula"];
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
+const paymentMethods = ["M-PESA", "Bank Transfer", "USDT"];
 
 interface BotTransaction {
     id: string;
@@ -25,29 +26,45 @@ interface BotTransaction {
     userName: string;
     amount: number;
     timestamp: Date;
+    modeOfPayment: string;
+    transactionCode: string;
+}
+
+const generateRandomString = (length: number) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
 }
 
 const generateRandomTransaction = (): BotTransaction => {
     const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
     const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
     const type = transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
+    const modeOfPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
     
-    // Generate more realistic amounts
     let amount;
     if (type === 'Deposit') {
         amount = Math.floor(Math.random() * (20000 - 3000 + 1) + 3000);
-    } else { // Withdrawals are typically larger
+    } else {
         amount = Math.floor(Math.random() * (50000 - 5000 + 1) + 5000);
     }
-     // Round to nearest 100 for cleaner numbers
     amount = Math.round(amount / 100) * 100;
 
+    const codePart1 = generateRandomString(3);
+    const codePart2 = generateRandomString(3);
+    const transactionCode = `${codePart1}•••${codePart2}`;
+
     return {
-        id: new Date().getTime().toString() + Math.random(), // Unique ID
+        id: new Date().getTime().toString() + Math.random(),
         type: type,
         userName: `${firstName} ${lastName.charAt(0)}.`,
         amount: amount,
         timestamp: new Date(),
+        modeOfPayment: modeOfPayment,
+        transactionCode: transactionCode,
     };
 };
 
@@ -57,21 +74,28 @@ export default function LatestTransactions() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Generate initial set of transactions
     const initialTransactions = Array.from({ length: 5 }, generateRandomTransaction).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
     setTransactions(initialTransactions);
     setLoading(false);
 
-    // Set up an interval to add new transactions
     const interval = setInterval(() => {
       const newTx = generateRandomTransaction();
       setTransactions(prev => 
-        [newTx, ...prev].slice(0, 7) // Keep the list size manageable
+        [newTx, ...prev].slice(0, 7)
       );
-    }, 5000); // Add a new transaction every 5 seconds
+    }, 5000); 
 
     return () => clearInterval(interval);
   }, []);
+  
+  const getPaymentIcon = (method: string) => {
+    switch (method) {
+        case "M-PESA": return <Smartphone className="h-4 w-4" />;
+        case "Bank Transfer": return <Landmark className="h-4 w-4" />;
+        case "USDT": return <Banknote className="h-4 w-4" />;
+        default: return <Banknote className="h-4 w-4" />;
+    }
+  }
 
   return (
     <Card>
@@ -107,9 +131,13 @@ export default function LatestTransactions() {
                   <ArrowDownCircle className="h-6 w-6 text-red-500" />
                 )}
               </div>
-              <div className="flex-grow">
+              <div className="flex-grow space-y-1">
                 <p className="font-medium">{tx.type} by {tx.userName}</p>
-                <p className="text-sm text-muted-foreground">{formatDistanceToNow(tx.timestamp, { addSuffix: true })}</p>
+                <div className="text-sm text-muted-foreground flex items-center gap-4">
+                    <span>{formatDistanceToNow(tx.timestamp, { addSuffix: true })}</span>
+                    <span className="flex items-center gap-1">{getPaymentIcon(tx.modeOfPayment)} {tx.modeOfPayment}</span>
+                    <span className="font-mono text-xs hidden sm:inline">ID: {tx.transactionCode}</span>
+                </div>
               </div>
               <div className="font-bold text-right">
                 {formatCurrency(tx.amount)}
