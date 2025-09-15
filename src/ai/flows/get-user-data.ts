@@ -33,7 +33,7 @@ export type ReferralData = z.infer<typeof ReferralDataSchema>;
  * It calculates total invested capital and commissions for each referred user.
  */
 export async function getReferralData(): Promise<ReferralData> {
-    return getReferralDataFlow();
+    return getReferralDataFlow({});
 }
 
 const getReferralDataFlow = ai.defineFlow(
