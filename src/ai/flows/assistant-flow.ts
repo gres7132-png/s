@@ -9,6 +9,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { Readable } from 'stream';
 
 const AssistantInputSchema = z.string();
 type AssistantInput = z.infer<typeof AssistantInputSchema>;
