@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from "next/link";
@@ -217,7 +218,7 @@ function UserProfileNav() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person avatar" alt={user?.displayName ?? "User"} />
+                  <AvatarImage src={user?.photoURL ?? `https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person avatar" alt={user?.displayName ?? "User"} />
                   <AvatarFallback>{user?.displayName?.charAt(0) ?? 'U'}</AvatarFallback>
                 </Avatar>
               </Button>

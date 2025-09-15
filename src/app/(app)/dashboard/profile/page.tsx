@@ -31,7 +31,7 @@ import { useEffect, useState } from "react";
 import { AlertCircle, Loader2, Upload } from "lucide-react";
 import { updateProfile, verifyBeforeUpdateEmail } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -44,6 +44,7 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 
 const profileSchema = z.object({
@@ -54,7 +55,7 @@ const profileSchema = z.object({
   age: z.coerce.number().positive("Age must be a positive number.").optional(),
   birthYear: z.coerce.number().gt(1900, "Enter a valid birth year.").optional(),
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
-  idImage: z.any().optional(), // For file uploads
+  photo: z.any().optional(),
 });
 
 
@@ -111,27 +112,36 @@ export default function ProfilePage() {
     if (!user) return;
     setLoading(true);
     try {
-      const newDisplayName = `${values.firstName} ${values.lastName}`.trim();
-      if (newDisplayName !== user.displayName) {
-        await updateProfile(user, { displayName: newDisplayName });
-      }
-      const userDocRef = doc(db, "users", user.uid);
-      await setDoc(userDocRef, { 
-        bio: values.bio,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        displayName: newDisplayName,
-        email: values.email, // Keep email in firestore for reference
-        phoneNumber: values.phoneNumber,
-        age: values.age,
-        birthYear: values.birthYear,
-      }, { merge: true });
+        const newDisplayName = `${values.firstName} ${values.lastName}`.trim();
+        let photoURL = user.photoURL;
 
-      // In a real app, you would handle the file upload to a service like Firebase Storage here.
-      if (values.idImage && values.idImage.length > 0) {
-        console.log("ID Image to upload:", values.idImage[0]);
-        toast({ title: "ID Image Ready", description: "Image upload functionality is pending implementation."});
-      }
+        // Handle file upload
+        const imageFile = values.photo?.[0];
+        if (imageFile) {
+            const storageRef = ref(storage, `profileImages/${user.uid}`);
+            await uploadBytes(storageRef, imageFile);
+            photoURL = await getDownloadURL(storageRef);
+        }
+      
+        if (newDisplayName !== user.displayName || photoURL !== user.photoURL) {
+            await updateProfile(user, { 
+                displayName: newDisplayName,
+                photoURL: photoURL,
+             });
+        }
+        
+        const userDocRef = doc(db, "users", user.uid);
+        await setDoc(userDocRef, { 
+            bio: values.bio,
+            firstName: values.firstName,
+            lastName: values.lastName,
+            displayName: newDisplayName,
+            email: values.email, // Keep email in firestore for reference
+            phoneNumber: values.phoneNumber,
+            age: values.age,
+            birthYear: values.birthYear,
+            photoURL: photoURL,
+        }, { merge: true });
 
       toast({ title: "Profile Updated" });
     } catch (error: any) {
@@ -190,7 +200,7 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                     <div className="flex items-center space-x-4">
                         <Avatar className="h-20 w-20">
-                        <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
+                        <AvatarImage src={user?.photoURL ?? `https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
                         <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
                         </Avatar>
                     </div>
@@ -248,13 +258,13 @@ export default function ProfilePage() {
                     )} />
                      <div className="grid md:grid-cols-3 gap-4">
                          <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
-                            <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. +123456789" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. +123456789" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                         )} />
                          <FormField control={profileForm.control} name="age" render={({ field }) => (
-                            <FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" placeholder="e.g. 30" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" placeholder="e.g. 30" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                         )} />
                          <FormField control={profileForm.control} name="birthYear" render={({ field }) => (
-                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                         )} />
                     </div>
                     <FormField control={profileForm.control} name="bio" render={({ field }) => (
@@ -271,15 +281,15 @@ export default function ProfilePage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Identity Verification</CardTitle>
+                        <CardTitle>Profile Picture</CardTitle>
                         <CardDescription>
-                            Upload a government-issued ID to verify your identity. (This feature is under development).
+                            Upload a photo for your profile avatar.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                         <FormField control={profileForm.control} name="idImage" render={({ field }) => (
+                         <FormField control={profileForm.control} name="photo" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>ID Image</FormLabel>
+                                <FormLabel>Profile Photo</FormLabel>
                                 <FormControl>
                                     <div className="relative flex items-center gap-2">
                                         <Input type="file" accept="image/*" className="w-full" onChange={(e) => field.onChange(e.target.files)} />
