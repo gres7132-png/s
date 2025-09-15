@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useRef, useEffect, FormEvent } from "react";
-import { useCompletion } from 'ai/react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,13 +24,6 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
-  const { complete, completion, error } = useCompletion({
-    api: '/api/genkit/stream', // This is a conventional endpoint for streaming with genkit
-    body: {
-        flowId: 'assistantFlow'
-    }
-  });
-  
   useEffect(() => {
     const initialMessage: Message = {
       role: 'assistant',
@@ -49,7 +41,7 @@ export default function AssistantPage() {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage, {role: 'assistant', content: ''}]);
     setInput('');
     setIsLoading(true);
 
@@ -59,12 +51,9 @@ export default function AssistantPage() {
         for await (const chunk of stream) {
             assistantResponse += chunk;
             setMessages(prev => {
-                const lastMessage = prev[prev.length - 1];
-                if (lastMessage.role === 'assistant') {
-                    const newMessages = [...prev.slice(0, -1)];
-                    return [...newMessages, { role: 'assistant', content: assistantResponse }];
-                }
-                return [...prev, { role: 'assistant', content: assistantResponse }];
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1].content = assistantResponse;
+                return newMessages;
             });
         }
     } catch (err) {
@@ -73,7 +62,10 @@ export default function AssistantPage() {
             role: 'assistant',
             content: "I'm sorry, but I encountered an error. Please try again or contact support if the issue persists."
         };
-        setMessages(prev => [...prev, errorMessage]);
+        setMessages(prev => {
+            const newMessages = [...prev.slice(0, -1)];
+            return [...newMessages, errorMessage];
+        });
     } finally {
         setIsLoading(false);
     }
@@ -101,33 +93,8 @@ export default function AssistantPage() {
                 <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
                      <div className="space-y-6">
                         {messages.map((message, index) => (
-                        <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
-                            {message.role === 'assistant' && (
-                            <Avatar className="h-9 w-9 border">
-                                <AvatarFallback><Bot className="h-5 w-5"/></AvatarFallback>
-                            </Avatar>
-                            )}
-                            <div className={`max-w-xl rounded-lg p-3 text-sm ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                <ReactMarkdown
-                                    components={{
-                                        p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                                        ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-1" {...props} />,
-                                        ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-1" {...props} />,
-                                    }}
-                                >
-                                    {message.content}
-                                </ReactMarkdown>
-                            </div>
-                            {message.role === 'user' && (
-                            <Avatar className="h-9 w-9 border">
-                                <AvatarImage src={user?.photoURL ?? undefined} />
-                                <AvatarFallback><User className="h-5 w-5"/></AvatarFallback>
-                            </Avatar>
-                            )}
-                        </div>
-                        ))}
-                         {isLoading && (
-                            <div className="flex items-start gap-3">
+                          message.content === '' && isLoading ? (
+                            <div key={index} className="flex items-start gap-3">
                                 <Avatar className="h-9 w-9 border">
                                     <AvatarFallback><Bot className="h-5 w-5"/></AvatarFallback>
                                 </Avatar>
@@ -135,7 +102,33 @@ export default function AssistantPage() {
                                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                                 </div>
                             </div>
-                        )}
+                          ) : (
+                            <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
+                                {message.role === 'assistant' && (
+                                <Avatar className="h-9 w-9 border">
+                                    <AvatarFallback><Bot className="h-5 w-5"/></AvatarFallback>
+                                </Avatar>
+                                )}
+                                <div className={`max-w-xl rounded-lg p-3 text-sm ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                    <ReactMarkdown
+                                        components={{
+                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-1" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-1" {...props} />,
+                                        }}
+                                    >
+                                        {message.content}
+                                    </ReactMarkdown>
+                                </div>
+                                {message.role === 'user' && (
+                                <Avatar className="h-9 w-9 border">
+                                    <AvatarImage src={user?.photoURL ?? undefined} />
+                                    <AvatarFallback><User className="h-5 w-5"/></AvatarFallback>
+                                </Avatar>
+                                )}
+                            </div>
+                          )
+                        ))}
                     </div>
                 </ScrollArea>
                 <div className="border-t p-4">
