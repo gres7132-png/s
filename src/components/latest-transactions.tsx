@@ -15,11 +15,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 
 // --- Automated Bot Transaction Data ---
-// Expanded list of Kenyan first names
-const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Charles", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Dorothy", "Mark", "Sandra", "Paul", "Ashley", "Kevin", "Brian", "Sharon", "Cynthia", "Brenda", "Faith", "Grace", "Mercy", "Peter", "Samuel", "Stephen", "Esther", "Ann", "Ruth", "Moses", "Dennis", "Maureen", "Collins", "Vivian", "Ian", "Felix", "Abdi", "Aisha", "Fatuma", "Halima", "Juma", "Mohamed", "Omar", "Zainabu", "Baraka", "Akinyi", "Adhiambo", "Atieno", "Achieng", "Anyango", "Wanjiku", "Njeri", "Wambui", "Nyambura", "Muthoni", "Wairimu", "Wangari", "Chepkoech", "Cherono", "Chebet", "Jepchumba", "Naliaka", "Nekesa", "Nafula", "Mwikali", "Kavindu", "Nthenya"];
+// Expanded and more authentic list of Kenyan names
+const firstNames = ["Abdi", "Aisha", "Akinyi", "Ann", "Anthony", "Atieno", "Baraka", "Brenda", "Brian", "Charles", "Chebet", "Chepkoech", "Cherono", "Collins", "Cynthia", "Daniel", "David", "Dennis", "Dorothy", "Elizabeth", "Esther", "Faith", "Fatuma", "Felix", "Grace", "Halima", "Ian", "James", "Jennifer", "Jepchumba", "Jessica", "John", "Joseph", "Juma", "Karen", "Kavindu", "Kevin", "Linda", "Lisa", "Mark", "Mary", "Matthew", "Maureen", "Mercy", "Michael", "Mohamed", "Moses", "Muthoni", "Mwikali", "Nancy", "Nekesa", "Njeri", "Nthenya", "Nyambura", "Omar", "Patricia", "Paul", "Peter", "Richard", "Robert", "Ruth", "Samuel", "Sandra", "Sarah", "Sharon", "Stephen", "Susan", "Thomas", "Vivian", "Wairimu", "Wambui", "Wanjiku", "William", "Zainabu"];
 
-// Expanded list of Kenyan last names
-const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula", "Akinyi", "Chepkoech", "Muthoni", "Njeri", "Atieno", "Wairimu", "Achieng", "Cherono", "Anyango", "Nyambura", "Abdullahi", "Hassan", "Ali", "Omar", "Mohamed", "Onyango", "Odhiambo", "Okoth", "Oloo", "Ouma", "Kipruto", "Kiprotich", "Kipkoech", "Kipkemboi", "Kibet", "Mutua", "Musyoka", "Munyao", "Kioko", "Nzioka", "Nyaga", "Mbugua", "Githinji", "Njuguna", "Gitau", "Wachira", "Simiyu", "Barasa", "Masinde", "Makokha", "Nyaboke", "Mogaka", "Onsongo"];
+const lastNames = ["Abdullahi", "Achieng", "Adhiambo", "Ali", "Anyango", "Atieno", "Barasa", "Chebet", "Chepkoech", "Cherono", "Githinji", "Gitau", "Hassan", "Kamau", "Kariuki", "Kibet", "Kimani", "Kioko", "Kipkemboi", "Kipkoech", "Kiprotich", "Kipruto", "Maina", "Makokha", "Masinde", "Mbugua", "Mogaka", "Mohamed", "Munyao", "Musyoka", "Mutua", "Muthoni", "Mwangi", "Naliaka", "Njeri", "Njoroge", "Njuguna", "Nyaboke", "Nyaga", "Nyambura", "Nzioka", "Ochieng", "Odhiambo", "Okoth", "Oloo", "Omar", "Onsongo", "Onyango", "Otieno", "Ouma", "Simiyu", "Wachira", "Wafula", "Wairimu", "Wanjala", "Wanjiku"];
 
 
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
@@ -59,9 +58,9 @@ const generateRandomTransaction = (): BotTransaction => {
     // Make the amount a round number, which is more realistic
     amount = Math.round(amount / 100) * 100;
 
-    const fullCode = `T${generateRandomString(9)}`;
+    const fullCode = `S${generateRandomString(9)}`;
     // Mask the transaction code for realism and security feel
-    const transactionCode = `${fullCode.substring(0, 4)}•••${fullCode.substring(7)}`;
+    const transactionCode = `${fullCode.substring(0, 4)}...${fullCode.substring(7)}`;
 
 
     return {
