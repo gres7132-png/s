@@ -196,7 +196,7 @@ function NavMenu() {
 }
 
 function UserProfileNav() {
-    const { user, loading, auth, isAdmin } = useAuth();
+    const { user, loading, auth, isAdmin, emailVerified } = useAuth();
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -228,6 +228,7 @@ function UserProfileNav() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium leading-none">{user?.displayName ?? 'User'}</p>
                     {isAdmin && <Badge variant="secondary">Admin</Badge>}
+                    {emailVerified && <Badge variant="default">Verified</Badge>}
                   </div>
                   <p className="text-xs leading-none text-muted-foreground">
                     {user?.email}
