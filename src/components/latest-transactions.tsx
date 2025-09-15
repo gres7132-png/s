@@ -13,8 +13,7 @@ import { ArrowDownCircle, ArrowUpCircle, Banknote, Landmark, Smartphone } from "
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, limit } from "firebase/firestore";
+import { getLiveTransactionsData, LiveTransactionsData } from "@/ai/flows/get-live-transactions-data";
 
 
 // --- Automated Bot Transaction Data ---
@@ -117,45 +116,36 @@ const generateRandomTransaction = (
 export default function LatestTransactions() {
   const [transactions, setTransactions] = useState<BotTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [realUsers, setRealUsers] = useState<{ displayName: string }[]>([]);
-  const [packagePrices, setPackagePrices] = useState<number[]>([]);
+  const [liveData, setLiveData] = useState<LiveTransactionsData | null>(null);
 
   useEffect(() => {
-    // Fetch a sample of real users from Firestore to mix into the feed
-    const usersQuery = query(collection(db, "users"), limit(20));
-    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
-        const fetchedUsers: { displayName: string }[] = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.displayName) {
-                fetchedUsers.push({ displayName: data.displayName });
-            }
-        });
-        setRealUsers(fetchedUsers);
-    });
+    // Fetch real user and package data securely via Genkit flow
+    async function fetchData() {
+        try {
+            const data = await getLiveTransactionsData();
+            setLiveData(data);
+        } catch (error) {
+            console.error("Failed to fetch live transaction data:", error);
+            // Don't block the UI, the bot can run with generated names
+        } finally {
+            setLoading(false);
+        }
+    }
+    fetchData();
+  }, []);
 
-    // Fetch investment package prices
-    const packagesQuery = query(collection(db, "silverLevelPackages"));
-    const unsubscribePackages = onSnapshot(packagesQuery, (snapshot) => {
-        const prices: number[] = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.price) {
-                prices.push(data.price);
-            }
-        });
-        setPackagePrices(prices);
-    });
-
+  useEffect(() => {
+    if(loading) return; // Don't start the interval until initial data is loaded
 
     // Generate initial transactions
-    const initialTransactions = Array.from({ length: 5 }, () => generateRandomTransaction(realUsers, packagePrices)).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
+    const initialTransactions = Array.from({ length: 5 }, () => 
+        generateRandomTransaction(liveData?.users, liveData?.packagePrices)
+    ).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
     setTransactions(initialTransactions);
-    setLoading(false);
 
     // This interval creates the "live" feeling by adding new transactions
     const interval = setInterval(() => {
-      const newTx = generateRandomTransaction(realUsers, packagePrices);
+      const newTx = generateRandomTransaction(liveData?.users, liveData?.packagePrices);
       setTransactions(prev => 
         [newTx, ...prev].slice(0, 7).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       );
@@ -163,10 +153,8 @@ export default function LatestTransactions() {
 
     return () => {
         clearInterval(interval);
-        unsubscribeUsers(); // Clean up the Firestore listener
-        unsubscribePackages();
     };
-  }, [realUsers, packagePrices]); // Rerun effect if data changes
+  }, [loading, liveData]); // Rerun effect if data changes
   
   const getPaymentIcon = (method: string) => {
     switch (method) {
@@ -228,5 +216,3 @@ export default function LatestTransactions() {
     </Card>
   );
 }
-
-    
