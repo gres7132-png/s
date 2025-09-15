@@ -56,7 +56,6 @@ const profileSchema = z.object({
   birthYear: z.coerce.number().gt(1900, "Enter a valid birth year.").optional(),
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
   photo: z.any().optional(),
-  idImage: z.any().optional(),
 });
 
 
@@ -138,9 +137,6 @@ export default function ProfilePage() {
                 photoURL: photoURL,
              });
         }
-        
-        // Note: The idImage is in values.idImage?.[0], but we are not processing it yet.
-        // A secure backend flow will be needed for that in the future.
         
         const userDocRef = doc(db, "users", user.uid);
         await setDoc(userDocRef, { 
@@ -313,29 +309,6 @@ export default function ProfilePage() {
                          )} />
                     </CardContent>
                 </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Identity Verification</CardTitle>
-                        <CardDescription>
-                            For higher security, upload a government-issued ID (Passport, National ID). This will be reviewed by an administrator.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <FormField control={profileForm.control} name="idImage" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>ID Image</FormLabel>
-                                <FormControl>
-                                    <div className="relative flex items-center gap-2">
-                                        <Input type="file" accept="image/*" className="w-full" onChange={(e) => field.onChange(e.target.files)} />
-                                        <Upload className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                         )} />
-                    </CardContent>
-                </Card>
              </form>
         </Form>
       </div>
@@ -363,3 +336,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
