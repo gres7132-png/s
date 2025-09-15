@@ -17,6 +17,7 @@ import {
   LifeBuoy,
   Globe,
   List,
+  ShieldCheck,
 } from "lucide-react";
 
 import { signOut } from "firebase/auth";
@@ -69,6 +70,7 @@ const navItems = [
   { href: "/dashboard/referrals", icon: UserPlus, label: "Referral Program" },
   { href: "/dashboard/distributor", icon: Gift, label: "Contributor Program" },
   { href: "/dashboard/commissions", icon: DollarSign, label: "Agent Commissions" },
+  { href: "/dashboard/security", icon: ShieldCheck, label: "Security" },
 ];
 
 const adminNavItems = [

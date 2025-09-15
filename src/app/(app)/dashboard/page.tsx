@@ -17,12 +17,17 @@ import {
   ArrowDown,
   ArrowUp,
   DollarSign,
+  MailWarning,
+  Loader2,
 } from "lucide-react";
 import LatestTransactions from "@/components/latest-transactions";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import { sendEmailVerification } from "firebase/auth";
 
 interface UserStats {
   availableBalance: number;
@@ -32,10 +37,12 @@ interface UserStats {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, emailVerified } = useAuth();
+  const { toast } = useToast();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   useEffect(() => {
     if (user) {
       const userStatsDocRef = doc(db, "userStats", user.uid);
@@ -61,8 +68,41 @@ export default function DashboardPage() {
     }
   }, [user]);
 
+  const handleResendVerification = async () => {
+    if (!user) return;
+    setIsSendingEmail(true);
+    try {
+      await sendEmailVerification(user);
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your inbox (and spam folder) for the verification link.",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error Sending Email",
+        description: error.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8">
+       {emailVerified === false && (
+        <Alert variant="destructive">
+          <MailWarning className="h-4 w-4" />
+          <AlertTitle>Verify Your Email Address</AlertTitle>
+          <AlertDescription className="flex justify-between items-center">
+            <p>Please check your inbox to verify your email. This is required to secure your account.</p>
+            <Button onClick={handleResendVerification} disabled={isSendingEmail} size="sm">
+              {isSendingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Resend Email
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Control Panel</h1>
       </div>

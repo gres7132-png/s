@@ -1,3 +1,4 @@
+
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
@@ -16,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   auth: Auth;
   isAdmin: boolean; // Flag to indicate if the user is an admin
+  emailVerified: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,11 +25,13 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   auth: auth,
   isAdmin: false,
+  emailVerified: null,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -37,6 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setUser(user);
+        setEmailVerified(user.emailVerified);
         // Check if the logged-in user's email is in the admin list
         setIsAdmin(ADMIN_EMAILS.includes(user.email || ""));
         if (isAuthPage) {
@@ -45,7 +50,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setUser(null);
         setIsAdmin(false);
-        if (!isAuthPage) {
+        setEmailVerified(null);
+        if (!isAuthPage && !pathname.startsWith('/website')) {
           router.push("/auth");
         }
       }
@@ -53,9 +59,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [isAuthPage, router]);
+  }, [isAuthPage, router, pathname]);
 
-  const value = { user, loading, auth, isAdmin };
+  const value = { user, loading, auth, isAdmin, emailVerified };
 
   // Render children immediately for a faster perceived load.
   // The redirects inside the useEffect will handle routing logic.

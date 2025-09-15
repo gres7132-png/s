@@ -7,6 +7,7 @@ import * as z from "zod";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
@@ -115,6 +116,9 @@ export function AuthForm() {
         displayName: values.fullName,
       });
 
+      // Send verification email
+      await sendEmailVerification(newUser);
+
       const batch = writeBatch(db);
 
       // 1. Set the user document
@@ -140,7 +144,7 @@ export function AuthForm() {
 
       toast({
         title: "Welcome!",
-        description: "Your account has been created successfully.",
+        description: "Your account has been created. Please check your email to verify your account.",
       });
       router.push("/dashboard");
 
