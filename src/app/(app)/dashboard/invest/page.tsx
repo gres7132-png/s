@@ -20,6 +20,7 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { investPackage } from "@/ai/flows/user-management";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface InvestmentPackage {
   id: string;
@@ -33,6 +34,7 @@ interface InvestmentPackage {
 export default function InvestPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
   const [silverLevelPackages, setSilverLevelPackages] = useState<InvestmentPackage[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [isInvesting, setIsInvesting] = useState<string | null>(null);
@@ -68,11 +70,20 @@ export default function InvestPage() {
       });
 
     } catch (error: any) {
-       toast({
-            variant: "destructive",
-            title: "Investment Failed",
-            description: error.message || "Could not process your investment. Please try again.",
-        });
+        if (error.message.includes("Insufficient funds")) {
+            toast({
+                variant: "destructive",
+                title: "Insufficient Funds",
+                description: "Redirecting you to add funds to your wallet.",
+            });
+            router.push('/dashboard/wallet?tab=deposit');
+        } else {
+            toast({
+                variant: "destructive",
+                title: "Investment Failed",
+                description: error.message || "Could not process your investment. Please try again.",
+            });
+        }
     } finally {
         setIsInvesting(null);
     }
