@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -158,20 +157,33 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
       throw new Error('Application not found.');
     }
     
-    if (input.status === 'rejected') {
-      // If rejected, refund the deposit to the user's available balance.
-      const appData = applicationDoc.data();
-      const userId = appData?.userId;
-      const depositAmount = appData?.depositAmount;
-      if (userId && depositAmount) {
-        const userStatsRef = db.doc(`userStats/${userId}`);
-        await userStatsRef.update({
-          availableBalance: FieldValue.increment(depositAmount),
-        });
+    await db.runTransaction(async (transaction) => {
+      if (input.status === 'rejected') {
+        // If rejected, refund the deposit to the user's available balance.
+        const appData = applicationDoc.data();
+        const userId = appData?.userId;
+        const depositAmount = appData?.depositAmount;
+
+        if (userId && depositAmount > 0) {
+          const userStatsRef = db.doc(`userStats/${userId}`);
+          // We must read the doc first in a transaction before writing.
+          const userStatsDoc = await transaction.get(userStatsRef); 
+          if(userStatsDoc.exists()) {
+             transaction.update(userStatsRef, {
+                availableBalance: FieldValue.increment(depositAmount),
+             });
+          } else {
+             // This case is unlikely but handled for safety.
+             transaction.set(userStatsRef, {
+                availableBalance: depositAmount,
+             });
+          }
+        }
       }
-    }
+      // Update the application status in the same transaction
+      transaction.update(applicationRef, { status: input.status });
+    });
     
-    await applicationRef.update({ status: input.status });
     return { success: true };
   }
 );
