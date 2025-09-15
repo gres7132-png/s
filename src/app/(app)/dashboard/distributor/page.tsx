@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Users, Loader2 } from "lucide-react";
+import { Users, Loader2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -174,6 +174,14 @@ export default function DistributorPage() {
             Apply to become a Golden Level contributor for monthly income opportunities.
           </p>
         </div>
+
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Important Notice</AlertTitle>
+          <AlertDescription>
+            Due to app maintenance you may experience challenges. In case of any challenges kindly <a href="https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ?mode=ems_wa_t" target="_blank" rel="noopener noreferrer" className="font-bold underline">contact support</a>.
+          </AlertDescription>
+        </Alert>
 
         {loadingData ? (
            <Skeleton className="h-16 w-full" />

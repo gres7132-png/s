@@ -35,7 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, DollarSign, Link as LinkIcon, Loader2, Landmark } from "lucide-react";
+import { Copy, DollarSign, Link as LinkIcon, Loader2, Landmark, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
@@ -43,6 +43,8 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { requestWithdrawal, submitDepositProof } from "@/ai/flows/user-management";
 import { useSearchParams } from "next/navigation";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 const depositSchema = z.object({
   amount: z.coerce.number().positive("Amount must be a positive number."),
@@ -297,6 +299,14 @@ export default function WalletPage() {
           Manage your funds and payment details.
         </p>
       </div>
+
+       <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Important Notice</AlertTitle>
+          <AlertDescription>
+            Due to app maintenance you may experience challenges. In case of any challenges kindly <a href="https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ?mode=ems_wa_t" target="_blank" rel="noopener noreferrer" className="font-bold underline">contact support</a>.
+          </AlertDescription>
+      </Alert>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-lg">

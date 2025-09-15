@@ -14,10 +14,12 @@ import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { investPackage } from "@/ai/flows/user-management";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from "next/link";
 
 interface InvestmentPackage {
   id: string;
@@ -84,6 +86,14 @@ export default function InvestPage() {
           Invest in a Silver Level package to start earning daily.
         </p>
       </div>
+
+       <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Important Notice</AlertTitle>
+          <AlertDescription>
+            Due to app maintenance you may experience challenges. In case of any challenges kindly <a href="https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ?mode=ems_wa_t" target="_blank" rel="noopener noreferrer" className="font-bold underline">contact support</a>.
+          </AlertDescription>
+      </Alert>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {loadingPackages ? (
