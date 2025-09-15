@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Upload } from "lucide-react";
 import { updateProfile, verifyBeforeUpdateEmail } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -50,8 +50,13 @@ const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
   email: z.string().email("Invalid email address.").readonly(),
+  phoneNumber: z.string().optional(),
+  age: z.coerce.number().positive("Age must be a positive number.").optional(),
+  birthYear: z.coerce.number().gt(1900, "Enter a valid birth year.").optional(),
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
+  idImage: z.any().optional(), // For file uploads
 });
+
 
 const emailSchema = z.object({
     newEmail: z.string().email("Please enter a valid new email address."),
@@ -86,6 +91,9 @@ export default function ProfilePage() {
           firstName: data?.firstName || "",
           lastName: data?.lastName || "",
           email: user.email || "",
+          phoneNumber: data?.phoneNumber || "",
+          age: data?.age,
+          birthYear: data?.birthYear,
           bio: data?.bio || "",
         });
         emailForm.reset({
@@ -114,7 +122,17 @@ export default function ProfilePage() {
         lastName: values.lastName,
         displayName: newDisplayName,
         email: values.email, // Keep email in firestore for reference
+        phoneNumber: values.phoneNumber,
+        age: values.age,
+        birthYear: values.birthYear,
       }, { merge: true });
+
+      // In a real app, you would handle the file upload to a service like Firebase Storage here.
+      if (values.idImage && values.idImage.length > 0) {
+        console.log("ID Image to upload:", values.idImage[0]);
+        toast({ title: "ID Image Ready", description: "Image upload functionality is pending implementation."});
+      }
+
       toast({ title: "Profile Updated" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
@@ -160,87 +178,121 @@ export default function ProfilePage() {
 
     <div className="grid gap-8 lg:grid-cols-3">
      <div className="lg:col-span-2 space-y-8">
-        <Card>
-            <Form {...profileForm}>
+        <Form {...profileForm}>
             <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
-                <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
-                    Update your personal details here. Email address must be changed separately for security.
-                </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                <div className="flex items-center space-x-4">
-                    <Avatar className="h-20 w-20">
-                    <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
-                    <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
-                    </Avatar>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                    <FormField control={profileForm.control} name="firstName" render={({ field }) => (
-                        <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+                <Card>
+                    <CardHeader>
+                    <CardTitle>Personal Information</CardTitle>
+                    <CardDescription>
+                        Update your personal details here. Email address must be changed separately for security.
+                    </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                    <div className="flex items-center space-x-4">
+                        <Avatar className="h-20 w-20">
+                        <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} data-ai-hint="person face" />
+                        <AvatarFallback>{user?.displayName?.charAt(0) ?? "U"}</AvatarFallback>
+                        </Avatar>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <FormField control={profileForm.control} name="firstName" render={({ field }) => (
+                            <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={profileForm.control} name="lastName" render={({ field }) => (
+                            <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                    </div>
+                     <FormField control={profileForm.control} name="email" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Email Address</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl><Input type="email" placeholder="user@example.com" {...field} readOnly className="bg-muted"/></FormControl>
+                                <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button type="button" variant="outline">Change</Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Change Your Email Address</DialogTitle>
+                                            <DialogDescription>
+                                                Enter your new email address below. A verification link will be sent to it to confirm the change.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <Form {...emailForm}>
+                                            <form id="email-change-form" onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 py-4">
+                                                <FormField control={emailForm.control} name="newEmail" render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>New Email</FormLabel>
+                                                        <FormControl>
+                                                            <Input type="email" placeholder="new.email@example.com" {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )} />
+                                            </form>
+                                        </Form>
+                                        <DialogFooter>
+                                            <DialogClose asChild>
+                                                <Button type="button" variant="ghost" disabled={isChangingEmail}>Cancel</Button>
+                                            </DialogClose>
+                                            <Button type="submit" form="email-change-form" disabled={isChangingEmail}>
+                                                {isChangingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Send Verification
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
                     )} />
-                    <FormField control={profileForm.control} name="lastName" render={({ field }) => (
-                        <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                     <div className="grid md:grid-cols-3 gap-4">
+                         <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
+                            <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. +123456789" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                         <FormField control={profileForm.control} name="age" render={({ field }) => (
+                            <FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" placeholder="e.g. 30" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                         <FormField control={profileForm.control} name="birthYear" render={({ field }) => (
+                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                    </div>
+                    <FormField control={profileForm.control} name="bio" render={({ field }) => (
+                        <FormItem><FormLabel>Bio</FormLabel><FormControl><Textarea placeholder="Tell us a little bit about yourself" className="resize-none" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
-                </div>
-                 <FormField control={profileForm.control} name="email" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <div className="flex items-center gap-2">
-                             <FormControl><Input type="email" placeholder="user@example.com" {...field} readOnly className="bg-muted"/></FormControl>
-                             <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-                                 <DialogTrigger asChild>
-                                     <Button type="button" variant="outline">Change</Button>
-                                 </DialogTrigger>
-                                 <DialogContent>
-                                     <DialogHeader>
-                                         <DialogTitle>Change Your Email Address</DialogTitle>
-                                         <DialogDescription>
-                                            Enter your new email address below. A verification link will be sent to it to confirm the change.
-                                         </DialogDescription>
-                                     </DialogHeader>
-                                     <Form {...emailForm}>
-                                         <form id="email-change-form" onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 py-4">
-                                            <FormField control={emailForm.control} name="newEmail" render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>New Email</FormLabel>
-                                                    <FormControl>
-                                                        <Input type="email" placeholder="new.email@example.com" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )} />
-                                         </form>
-                                     </Form>
-                                     <DialogFooter>
-                                         <DialogClose asChild>
-                                            <Button type="button" variant="ghost" disabled={isChangingEmail}>Cancel</Button>
-                                         </DialogClose>
-                                         <Button type="submit" form="email-change-form" disabled={isChangingEmail}>
-                                             {isChangingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                             Send Verification
-                                         </Button>
-                                     </DialogFooter>
-                                 </DialogContent>
-                             </Dialog>
-                        </div>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={profileForm.control} name="bio" render={({ field }) => (
-                    <FormItem><FormLabel>Bio</FormLabel><FormControl><Textarea placeholder="Tell us a little bit about yourself" className="resize-none" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                </CardContent>
-                <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={loading || authLoading}>
-                    {(loading || authLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Personal Info
-                </Button>
-                </CardFooter>
-            </form>
-            </Form>
-        </Card>
+                    </CardContent>
+                    <CardFooter className="border-t px-6 py-4">
+                    <Button type="submit" disabled={loading || authLoading}>
+                        {(loading || authLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Personal Info
+                    </Button>
+                    </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Identity Verification</CardTitle>
+                        <CardDescription>
+                            Upload a government-issued ID to verify your identity. (This feature is under development).
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <FormField control={profileForm.control} name="idImage" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>ID Image</FormLabel>
+                                <FormControl>
+                                    <div className="relative flex items-center gap-2">
+                                        <Input type="file" accept="image/*" className="w-full" onChange={(e) => field.onChange(e.target.files)} />
+                                        <Upload className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                         )} />
+                    </CardContent>
+                </Card>
+             </form>
+        </Form>
       </div>
       
        <div className="lg:col-span-1">
@@ -259,14 +311,9 @@ export default function ProfilePage() {
                     </AlertDescription>
                 </Alert>
             </CardContent>
-             <CardFooter>
-                <Button asChild className="w-full">
-                    <Link href="/dashboard/wallet?tab=banking">Manage Payment Details</Link>
-                </Button>
-            </CardFooter>
         </Card>
       </div>
-     </div>
+    </div>
     </div>
   );
 }
