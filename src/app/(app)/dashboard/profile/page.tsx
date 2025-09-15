@@ -56,6 +56,7 @@ const profileSchema = z.object({
   birthYear: z.coerce.number().gt(1900, "Enter a valid birth year.").optional(),
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
   photo: z.any().optional(),
+  idImage: z.any().optional(),
 });
 
 
@@ -75,7 +76,15 @@ export default function ProfilePage() {
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { firstName: "", lastName: "", email: "", bio: "", phoneNumber: "", age: 0, birthYear: 0 },
+    defaultValues: { 
+      firstName: "", 
+      lastName: "", 
+      email: "", 
+      bio: "", 
+      phoneNumber: "", 
+      age: undefined, 
+      birthYear: undefined 
+    },
   });
   
   const emailForm = useForm<EmailFormValues>({
@@ -115,7 +124,7 @@ export default function ProfilePage() {
         const newDisplayName = `${values.firstName} ${values.lastName}`.trim();
         let photoURL = user.photoURL;
 
-        // Handle file upload
+        // Handle profile photo upload
         const imageFile = values.photo?.[0];
         if (imageFile) {
             const storageRef = ref(storage, `profileImages/${user.uid}`);
@@ -129,6 +138,9 @@ export default function ProfilePage() {
                 photoURL: photoURL,
              });
         }
+        
+        // Note: The idImage is in values.idImage?.[0], but we are not processing it yet.
+        // A secure backend flow will be needed for that in the future.
         
         const userDocRef = doc(db, "users", user.uid);
         await setDoc(userDocRef, { 
@@ -264,11 +276,11 @@ export default function ProfilePage() {
                             <FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" placeholder="e.g. 30" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                         )} />
                          <FormField control={profileForm.control} name="birthYear" render={({ field }) => (
-                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Birth Year</FormLabel><FormControl><Input type="number" placeholder="e.g. 1993" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormMessage /></FormItem>
                         )} />
                     </div>
                     <FormField control={profileForm.control} name="bio" render={({ field }) => (
-                        <FormItem><FormLabel>Bio</FormLabel><FormControl><Textarea placeholder="Tell us a little bit about yourself" className="resize-none" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Bio</FormLabel><FormControl><Textarea placeholder="Tell us a little bit about yourself" className="resize-none" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )} />
                     </CardContent>
                     <CardFooter className="border-t px-6 py-4">
@@ -283,13 +295,36 @@ export default function ProfilePage() {
                     <CardHeader>
                         <CardTitle>Profile Picture</CardTitle>
                         <CardDescription>
-                            Upload a photo for your profile avatar.
+                            Upload a photo for your public profile avatar.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                          <FormField control={profileForm.control} name="photo" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Profile Photo</FormLabel>
+                                <FormControl>
+                                    <div className="relative flex items-center gap-2">
+                                        <Input type="file" accept="image/*" className="w-full" onChange={(e) => field.onChange(e.target.files)} />
+                                        <Upload className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                         )} />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Identity Verification</CardTitle>
+                        <CardDescription>
+                            For higher security, upload a government-issued ID (Passport, National ID). This will be reviewed by an administrator.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <FormField control={profileForm.control} name="idImage" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>ID Image</FormLabel>
                                 <FormControl>
                                     <div className="relative flex items-center gap-2">
                                         <Input type="file" accept="image/*" className="w-full" onChange={(e) => field.onChange(e.target.files)} />
