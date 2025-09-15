@@ -12,5 +12,5 @@ export function formatCurrency(amount: number) {
     maximumFractionDigits: 0,
   });
 
-  return `KES ${kesFormatter.format(amount)}`;
+  return `KSh ${kesFormatter.format(amount)}`;
 }
