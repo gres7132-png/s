@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +44,8 @@ const signInSchema = z.object({
 });
 
 const signUpSchema = z.object({
-  fullName: z.string().min(1, { message: "Full name is required." }),
+  firstName: z.string().min(1, { message: "First name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   referralCode: z.string().optional(),
@@ -67,7 +69,8 @@ export function AuthForm() {
   const signUpForm = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
-      fullName: "",
+      firstName: "",
+      lastName: "",
       email: "",
       password: "",
       referralCode: referralCodeFromUrl || "",
@@ -111,9 +114,10 @@ export function AuthForm() {
         values.password
       );
       const newUser = userCredential.user;
+      const displayName = `${values.firstName} ${values.lastName}`.trim();
 
       await updateProfile(newUser, {
-        displayName: values.fullName,
+        displayName: displayName,
       });
 
       // Send verification email
@@ -124,7 +128,9 @@ export function AuthForm() {
       // 1. Set the user document
       const userDocRef = doc(db, "users", newUser.uid);
       batch.set(userDocRef, {
-        displayName: values.fullName,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        displayName: displayName,
         email: values.email,
         createdAt: serverTimestamp(),
         referredBy: values.referralCode || null,
@@ -229,19 +235,34 @@ export function AuthForm() {
                 onSubmit={signUpForm.handleSubmit(onSignUpSubmit)}
                 className="space-y-4"
               >
-                <FormField
-                  control={signUpForm.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} disabled={isLoading} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={signUpForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John" {...field} disabled={isLoading} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signUpForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} disabled={isLoading} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={signUpForm.control}
                   name="email"

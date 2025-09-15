@@ -37,7 +37,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 
 const profileSchema = z.object({
-  fullName: z.string().min(1, "Full name is required."),
+  firstName: z.string().min(1, "First name is required."),
+  lastName: z.string().min(1, "Last name is required."),
   email: z.string().email("Invalid email address.").readonly(),
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
 });
@@ -51,7 +52,7 @@ export default function ProfilePage() {
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { fullName: "", email: "", bio: "" },
+    defaultValues: { firstName: "", lastName: "", email: "", bio: "" },
   });
 
   useEffect(() => {
@@ -60,7 +61,8 @@ export default function ProfilePage() {
       const unsubUser = onSnapshot(userDocRef, (doc) => {
         const data = doc.data();
         profileForm.reset({
-          fullName: user.displayName || "",
+          firstName: data?.firstName || "",
+          lastName: data?.lastName || "",
           email: user.email || "",
           bio: data?.bio || "",
         });
@@ -76,13 +78,16 @@ export default function ProfilePage() {
     if (!user) return;
     setLoading(true);
     try {
-      if (values.fullName !== user.displayName) {
-        await updateProfile(user, { displayName: values.fullName });
+      const newDisplayName = `${values.firstName} ${values.lastName}`.trim();
+      if (newDisplayName !== user.displayName) {
+        await updateProfile(user, { displayName: newDisplayName });
       }
       const userDocRef = doc(db, "users", user.uid);
       await setDoc(userDocRef, { 
         bio: values.bio,
-        displayName: values.fullName,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        displayName: newDisplayName,
       }, { merge: true });
       toast({ title: "Profile Updated" });
     } catch (error) {
@@ -120,13 +125,16 @@ export default function ProfilePage() {
                     </Avatar>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
-                    <FormField control={profileForm.control} name="fullName" render={({ field }) => (
-                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormField control={profileForm.control} name="firstName" render={({ field }) => (
+                        <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
-                    <FormField control={profileForm.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} readOnly className="bg-muted"/></FormControl><FormMessage /></FormItem>
+                    <FormField control={profileForm.control} name="lastName" render={({ field }) => (
+                        <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
+                 <FormField control={profileForm.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} readOnly className="bg-muted"/></FormControl><FormMessage /></FormItem>
+                )} />
                 <FormField control={profileForm.control} name="bio" render={({ field }) => (
                     <FormItem><FormLabel>Bio</FormLabel><FormControl><Textarea placeholder="Tell us a little bit about yourself" className="resize-none" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
