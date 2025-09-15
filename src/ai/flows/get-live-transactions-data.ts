@@ -6,6 +6,7 @@
  * This flow queries for a sample of real users and package prices to make the feed more realistic.
  */
 
+import '@/ai/flows/user-management'; // Ensures Admin SDK is initialized
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
