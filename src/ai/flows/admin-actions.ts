@@ -30,7 +30,7 @@ export const UpdateBalanceInputSchema = z.object({
   userId: z.string().describe("The UID of the user whose balance is being updated."),
   newBalance: z.number().min(0).describe("The new available balance for the user."),
 });
-type UpdateBalanceInput = z.infer<typeof UpdateBalanceInputSchema>;
+export type UpdateBalanceInput = z.infer<typeof UpdateBalanceInputSchema>;
 
 export async function updateBalance(input: UpdateBalanceInput): Promise<{success: boolean}> {
     return updateBalanceFlow(input);
@@ -64,7 +64,7 @@ export const UpdateInvestmentInputSchema = z.object({
   dailyReturn: z.number().positive(),
   status: z.enum(["active", "completed"]),
 });
-type UpdateInvestmentInput = z.infer<typeof UpdateInvestmentInputSchema>;
+export type UpdateInvestmentInput = z.infer<typeof UpdateInvestmentInputSchema>;
 
 export async function updateInvestment(input: UpdateInvestmentInput): Promise<{success: boolean}> {
     return updateInvestmentFlow(input);
