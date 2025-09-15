@@ -84,6 +84,13 @@
   }
 }
 
+@layer components {
+  /* Specific hover effect for the Bot icon in the sidebar */
+  a[href="/dashboard/assistant"]:hover > svg.bot-icon {
+    @apply -translate-y-0.5 scale-110 text-primary transition-transform duration-200;
+  }
+}
+
 .bg-accent {
   background-color: hsl(var(--accent)) !important;
 }
