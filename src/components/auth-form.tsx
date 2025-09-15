@@ -9,6 +9,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
@@ -37,6 +38,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 const signInSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -51,10 +62,19 @@ const signUpSchema = z.object({
   referralCode: z.string().optional(),
 });
 
+const resetPasswordSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+});
+
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+
+
 export function AuthForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const searchParams = useSearchParams();
   const referralCodeFromUrl = searchParams.get('ref');
 
@@ -76,6 +96,12 @@ export function AuthForm() {
       referralCode: referralCodeFromUrl || "",
     },
   });
+  
+  const resetPasswordForm = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { email: "" },
+  });
+
 
   useEffect(() => {
     if (referralCodeFromUrl) {
@@ -166,7 +192,29 @@ export function AuthForm() {
     }
   }
 
+  async function onPasswordResetSubmit(values: ResetPasswordFormValues) {
+    setIsResetting(true);
+    try {
+        await sendPasswordResetEmail(auth, values.email);
+        toast({
+            title: "Password Reset Email Sent",
+            description: "Please check your inbox for a link to reset your password.",
+        });
+        setIsResetDialogOpen(false); // Close the dialog on success
+    } catch (error: any) {
+        console.error("Password reset error:", error);
+        toast({
+            variant: "destructive",
+            title: "Request Failed",
+            description: error.message || "An unexpected error occurred. Please try again.",
+        });
+    } finally {
+        setIsResetting(false);
+    }
+  }
+
   return (
+    <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
     <Tabs defaultValue="signin" className="w-full max-w-md">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -204,7 +252,14 @@ export function AuthForm() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                       <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <DialogTrigger asChild>
+                            <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                                Forgot password?
+                            </Button>
+                        </DialogTrigger>
+                      </div>
                       <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                       </FormControl>
@@ -312,5 +367,41 @@ export function AuthForm() {
         </Card>
       </TabsContent>
     </Tabs>
+
+     <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Reset Your Password</DialogTitle>
+            <DialogDescription>
+                Enter your account's email address and we will send you a link to reset your password.
+            </DialogDescription>
+        </DialogHeader>
+        <Form {...resetPasswordForm}>
+            <form id="reset-password-form" onSubmit={resetPasswordForm.handleSubmit(onPasswordResetSubmit)} className="space-y-4 py-4">
+                <FormField
+                    control={resetPasswordForm.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                                <Input type="email" placeholder="name@example.com" {...field} disabled={isResetting} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </form>
+        </Form>
+        <DialogFooter>
+            <DialogClose asChild>
+                <Button type="button" variant="ghost" disabled={isResetting}>Cancel</Button>
+            </DialogClose>
+            <Button type="submit" form="reset-password-form" disabled={isResetting}>
+                {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send Reset Link
+            </Button>
+        </DialogFooter>
+    </DialogContent>
+    </Dialog>
   );
 }
