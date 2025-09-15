@@ -73,8 +73,6 @@ const generateRandomTransaction = (): BotTransaction => {
     } else {
         amount = Math.floor(Math.random() * (50000 - 5000 + 1) + 5000);
     }
-    // Make the amount a round number, which is more realistic
-    amount = Math.round(amount / 100) * 100;
 
     const fullCode = 'TI' + generateRandomString(8);
     // Mask the transaction code for realism and security feel
@@ -174,5 +172,7 @@ export default function LatestTransactions() {
     </Card>
   );
 }
+
+    
 
     
