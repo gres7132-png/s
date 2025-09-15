@@ -58,8 +58,11 @@ const generateRandomString = (length: number) => {
     return result;
 }
 
-// Function to generate a new bot transaction, now with access to real users
-const generateRandomTransaction = (realUsers: { displayName: string }[] = []): BotTransaction => {
+// Function to generate a new bot transaction, now with access to real users and package prices
+const generateRandomTransaction = (
+    realUsers: { displayName: string }[] = [],
+    packagePrices: number[] = []
+): BotTransaction => {
     let userName = '';
 
     // Decide whether to use a real user or generate a bot name (e.g., 20% chance to use a real user)
@@ -80,10 +83,16 @@ const generateRandomTransaction = (realUsers: { displayName: string }[] = []): B
     const modeOfPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
     
     let amount;
-    if (type === 'Deposit') {
-        amount = Math.random() * (20000 - 3000) + 3000;
+    // For deposits, make them rhyme with package prices
+    if (type === 'Deposit' && packagePrices.length > 0 && Math.random() < 0.8) {
+        // 80% chance to pick a package price
+        amount = packagePrices[Math.floor(Math.random() * packagePrices.length)];
+    } else if (type === 'Deposit') {
+        // Fallback for deposits (smaller, random top-ups)
+        amount = Math.random() * (5000 - 500) + 500;
     } else {
-        amount = Math.random() * (50000 - 5000) + 5000;
+        // Withdrawals remain random
+        amount = Math.random() * (50000 - 1000) + 1000;
     }
 
     const randomCodePart = generateRandomString(8);
@@ -109,6 +118,7 @@ export default function LatestTransactions() {
   const [transactions, setTransactions] = useState<BotTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [realUsers, setRealUsers] = useState<{ displayName: string }[]>([]);
+  const [packagePrices, setPackagePrices] = useState<number[]>([]);
 
   useEffect(() => {
     // Fetch a sample of real users from Firestore to mix into the feed
@@ -124,14 +134,28 @@ export default function LatestTransactions() {
         setRealUsers(fetchedUsers);
     });
 
+    // Fetch investment package prices
+    const packagesQuery = query(collection(db, "silverLevelPackages"));
+    const unsubscribePackages = onSnapshot(packagesQuery, (snapshot) => {
+        const prices: number[] = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.price) {
+                prices.push(data.price);
+            }
+        });
+        setPackagePrices(prices);
+    });
+
+
     // Generate initial transactions
-    const initialTransactions = Array.from({ length: 5 }, () => generateRandomTransaction(realUsers)).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
+    const initialTransactions = Array.from({ length: 5 }, () => generateRandomTransaction(realUsers, packagePrices)).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
     setTransactions(initialTransactions);
     setLoading(false);
 
     // This interval creates the "live" feeling by adding new transactions
     const interval = setInterval(() => {
-      const newTx = generateRandomTransaction(realUsers); // Pass the real users to the generator
+      const newTx = generateRandomTransaction(realUsers, packagePrices);
       setTransactions(prev => 
         [newTx, ...prev].slice(0, 7).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       );
@@ -140,8 +164,9 @@ export default function LatestTransactions() {
     return () => {
         clearInterval(interval);
         unsubscribeUsers(); // Clean up the Firestore listener
+        unsubscribePackages();
     };
-  }, [realUsers]); // Rerun effect if realUsers list changes (though it won't much after initial load)
+  }, [realUsers, packagePrices]); // Rerun effect if data changes
   
   const getPaymentIcon = (method: string) => {
     switch (method) {
@@ -204,3 +229,4 @@ export default function LatestTransactions() {
   );
 }
 
+    
