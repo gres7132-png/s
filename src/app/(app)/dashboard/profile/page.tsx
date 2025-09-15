@@ -29,11 +29,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { updateProfile } from "firebase/auth";
+import { updateProfile, verifyBeforeUpdateEmail } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 
 const profileSchema = z.object({
@@ -43,16 +53,28 @@ const profileSchema = z.object({
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
 });
 
+const emailSchema = z.object({
+    newEmail: z.string().email("Please enter a valid new email address."),
+});
+
 type ProfileFormValues = z.infer<typeof profileSchema>;
+type EmailFormValues = z.infer<typeof emailSchema>;
 
 export default function ProfilePage() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: { firstName: "", lastName: "", email: "", bio: "" },
+  });
+  
+  const emailForm = useForm<EmailFormValues>({
+    resolver: zodResolver(emailSchema),
+    defaultValues: { newEmail: "" },
   });
 
   useEffect(() => {
@@ -66,13 +88,16 @@ export default function ProfilePage() {
           email: user.email || "",
           bio: data?.bio || "",
         });
+        emailForm.reset({
+            newEmail: user.email || "",
+        });
       });
       
       return () => {
         unsubUser();
       };
     }
-  }, [user, profileForm]);
+  }, [user, profileForm, emailForm]);
 
   async function onProfileSubmit(values: ProfileFormValues) {
     if (!user) return;
@@ -88,12 +113,39 @@ export default function ProfilePage() {
         firstName: values.firstName,
         lastName: values.lastName,
         displayName: newDisplayName,
+        email: values.email, // Keep email in firestore for reference
       }, { merge: true });
       toast({ title: "Profile Updated" });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Update Failed" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onEmailSubmit(values: EmailFormValues) {
+    if (!user || values.newEmail === user.email) {
+        toast({ variant: "destructive", title: "No Change", description: "The new email is the same as the current one." });
+        return;
+    };
+    setIsChangingEmail(true);
+    try {
+        await verifyBeforeUpdateEmail(user, values.newEmail);
+        toast({
+            title: "Verification Required",
+            description: `A verification link has been sent to ${values.newEmail}. Please click the link to complete the email change.`,
+        });
+        setIsEmailDialogOpen(false); // Close dialog on success
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Email Change Failed",
+            description: error.code === 'auth/requires-recent-login'
+                ? "This is a sensitive operation. Please sign out and sign back in before changing your email."
+                : error.message || "An unexpected error occurred."
+        });
+    } finally {
+        setIsChangingEmail(false);
     }
   }
 
@@ -114,7 +166,7 @@ export default function ProfilePage() {
                 <CardHeader>
                 <CardTitle>Personal Information</CardTitle>
                 <CardDescription>
-                    Update your personal details here.
+                    Update your personal details here. Email address must be changed separately for security.
                 </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -133,7 +185,48 @@ export default function ProfilePage() {
                     )} />
                 </div>
                  <FormField control={profileForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} readOnly className="bg-muted"/></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <div className="flex items-center gap-2">
+                             <FormControl><Input type="email" placeholder="user@example.com" {...field} readOnly className="bg-muted"/></FormControl>
+                             <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                                 <DialogTrigger asChild>
+                                     <Button type="button" variant="outline">Change</Button>
+                                 </DialogTrigger>
+                                 <DialogContent>
+                                     <DialogHeader>
+                                         <DialogTitle>Change Your Email Address</DialogTitle>
+                                         <DialogDescription>
+                                            Enter your new email address below. A verification link will be sent to it to confirm the change.
+                                         </DialogDescription>
+                                     </DialogHeader>
+                                     <Form {...emailForm}>
+                                         <form id="email-change-form" onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 py-4">
+                                            <FormField control={emailForm.control} name="newEmail" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>New Email</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="email" placeholder="new.email@example.com" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )} />
+                                         </form>
+                                     </Form>
+                                     <DialogFooter>
+                                         <DialogClose asChild>
+                                            <Button type="button" variant="ghost" disabled={isChangingEmail}>Cancel</Button>
+                                         </DialogClose>
+                                         <Button type="submit" form="email-change-form" disabled={isChangingEmail}>
+                                             {isChangingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                             Send Verification
+                                         </Button>
+                                     </DialogFooter>
+                                 </DialogContent>
+                             </Dialog>
+                        </div>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={profileForm.control} name="bio" render={({ field }) => (
                     <FormItem><FormLabel>Bio</FormLabel><FormControl><Textarea placeholder="Tell us a little bit about yourself" className="resize-none" {...field} /></FormControl><FormMessage /></FormItem>
