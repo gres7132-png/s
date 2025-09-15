@@ -10,7 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-export const AssistantInputSchema = z.string();
+const AssistantInputSchema = z.string();
 export type AssistantInput = z.infer<typeof AssistantInputSchema>;
 export type AssistantOutput = string;
 
@@ -56,7 +56,7 @@ If a user asks about something not covered in the information, or if they need h
     For any issues, including challenges with the app or specific account problems, users should contact the support team via the official WhatsApp channel: https://chat.whatsapp.com/CUTtFWsav7M4OQyJEgUHlJ
 `;
 
-export const assistantFlow = ai.defineFlow(
+const assistantFlow = ai.defineFlow(
   {
     name: 'assistantFlow',
     inputSchema: AssistantInputSchema,
