@@ -51,9 +51,11 @@ const generateRandomTransaction = (): BotTransaction => {
     } else {
         amount = Math.floor(Math.random() * (50000 - 5000 + 1) + 5000);
     }
+    // Make the amount a round number, which is more realistic
     amount = Math.round(amount / 100) * 100;
 
     const fullCode = `T${generateRandomString(9)}`;
+    // Mask the transaction code for realism and security feel
     const transactionCode = `${fullCode.substring(0, 4)}•••${fullCode.substring(7)}`;
 
 
@@ -78,12 +80,14 @@ export default function LatestTransactions() {
     setTransactions(initialTransactions);
     setLoading(false);
 
+    // This interval creates the "live" feeling
     const interval = setInterval(() => {
       const newTx = generateRandomTransaction();
       setTransactions(prev => 
+        // Add the new transaction to the top and keep the list at 7 items
         [newTx, ...prev].slice(0, 7)
       );
-    }, 5000); 
+    }, 5000); // A new transaction appears every 5 seconds
 
     return () => clearInterval(interval);
   }, []);
