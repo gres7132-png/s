@@ -110,40 +110,40 @@ export default function InvestPage() {
         {loadingPackages ? (
           Array.from({ length: 4 }).map((_, i) => <Card key={i}><CardContent className="p-6"><Loader2 className="animate-spin"/></CardContent></Card>)
         ) : silverLevelPackages.map((pkg) => (
-          <Card
+          <button
             key={pkg.id}
-            className="flex flex-col transform hover:scale-105 transition-transform duration-300"
+            onClick={() => handleInvestment(pkg)}
+            disabled={isInvesting === pkg.id || loadingPackages}
+            className="text-left w-full disabled:opacity-50 disabled:cursor-not-allowed group"
           >
-            <CardHeader>
-              <CardTitle>{pkg.name}</CardTitle>
-              <CardDescription>
-                Invest {formatCurrency(pkg.price)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-4 text-sm">
-                <div className="flex justify-between items-baseline">
-                    <span className="text-muted-foreground">Daily Return</span>
-                    <span className="font-bold text-lg text-primary">{formatCurrency(pkg.dailyReturn)}</span>
+            <Card className="flex flex-col h-full transform transition-transform duration-300 group-hover:scale-105 group-hover:border-primary/50">
+              <CardHeader>
+                <CardTitle>{pkg.name}</CardTitle>
+                <CardDescription>
+                  Invest {formatCurrency(pkg.price)}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-grow space-y-4 text-sm">
+                  <div className="flex justify-between items-baseline">
+                      <span className="text-muted-foreground">Daily Return</span>
+                      <span className="font-bold text-lg text-primary">{formatCurrency(pkg.dailyReturn)}</span>
+                  </div>
+                   <div className="flex justify-between items-baseline">
+                      <span className="text-muted-foreground">Duration</span>
+                      <span className="font-semibold">{pkg.duration} Days</span>
+                  </div>
+                   <div className="flex justify-between items-baseline">
+                      <span className="text-muted-foreground">Total Earnings</span>
+                      <span className="font-bold text-accent">{formatCurrency(pkg.totalReturn)}</span>
+                  </div>
+              </CardContent>
+              <CardFooter>
+                 <div className="w-full text-center text-sm font-semibold text-primary group-hover:text-primary/80 transition-colors">
+                  {isInvesting === pkg.id ? <Loader2 className="animate-spin mx-auto" /> : "Invest Now"}
                 </div>
-                 <div className="flex justify-between items-baseline">
-                    <span className="text-muted-foreground">Duration</span>
-                    <span className="font-semibold">{pkg.duration} Days</span>
-                </div>
-                 <div className="flex justify-between items-baseline">
-                    <span className="text-muted-foreground">Total Earnings</span>
-                    <span className="font-bold text-accent">{formatCurrency(pkg.totalReturn)}</span>
-                </div>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                className="w-full bg-foreground text-background hover:bg-foreground/90"
-                onClick={() => handleInvestment(pkg)}
-                disabled={isInvesting === pkg.id || loadingPackages}
-              >
-                {isInvesting === pkg.id ? <Loader2 className="animate-spin" /> : "Invest Now"}
-              </Button>
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
+          </button>
         ))}
       </div>
 
