@@ -58,7 +58,7 @@ import type { ReactNode } from "react";
 import { Skeleton } from "./ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -263,18 +263,35 @@ function UserProfileNav() {
 }
 
 function UserInfo() {
-    const { user, loading } = useAuth();
+    const { user, loading: authLoading } = useAuth();
+    const [userInfo, setUserInfo] = useState<{ phoneNumber?: string } | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    if (loading) {
+    useEffect(() => {
+      if (user) {
+        setLoading(true);
+        const userDocRef = doc(db, "users", user.uid);
+        const unsubscribe = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            setUserInfo({ phoneNumber: doc.data().phoneNumber });
+          }
+          setLoading(false);
+        });
+        return () => unsubscribe();
+      } else {
+        setLoading(false);
+      }
+    }, [user]);
+
+    if (authLoading || loading) {
         return (
             <div className="p-2 space-y-2">
-                <Skeleton className="h-6 w-2/3" />
+                <Skeleton className="h-5 w-2/3" />
                 <Skeleton className="h-4 w-full" />
             </div>
         )
     }
     
-    // A simple way to generate a somewhat unique ID for display
     const displayId = user?.uid.substring(0, 5).toUpperCase() ?? 'N/A';
 
     return (
@@ -283,7 +300,7 @@ function UserInfo() {
                 ID: {displayId}
             </div>
             <div className="text-muted-foreground">
-                {user?.phoneNumber || "No phone number"}
+                {userInfo?.phoneNumber || "No phone number"}
             </div>
         </div>
     )
