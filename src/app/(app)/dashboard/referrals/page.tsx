@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -24,70 +24,37 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, getDocs, doc, getDoc, where } from "firebase/firestore";
 import { Input } from "@/components/ui/input";
-
-// This interface defines the structure for a referred user object.
-interface ReferredUser {
-    id: string;
-    displayName: string;
-    capital: number;
-    commissionEarned: number;
-    status: 'Active' | 'Pending';
-}
+import { getReferralData, ReferralData } from "@/ai/flows/get-user-data";
 
 export default function ReferralsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState("");
-  const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
+  const [referralData, setReferralData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
       
-      const referralsQuery = query(collection(db, "users"), where("referredBy", "==", user.uid));
-      
-      const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
-        setLoading(true);
-        // Map each referred user document to a promise that resolves with their calculated data.
-        const usersPromises = snapshot.docs.map(async (userDoc) => {
-            const referredUserId = userDoc.id;
-            const referredUserData = userDoc.data();
-
-            // Get the total investment for this referred user
-            const investmentsColRef = collection(db, "users", referredUserId, "investments");
-            const investmentsSnapshot = await getDocs(investmentsColRef);
-            
-            let totalInvested = 0;
-            investmentsSnapshot.forEach(investmentDoc => {
-                totalInvested += investmentDoc.data().price || 0;
+      getReferralData()
+        .then(data => {
+            setReferralData(data);
+        })
+        .catch(err => {
+            console.error("Failed to get referral data:", err);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load your referral information."
             });
-
-            const commission = totalInvested * 0.05; // 5% commission
-            const status: 'Active' | 'Pending' = totalInvested > 0 ? 'Active' : 'Pending';
-
-            return {
-                id: referredUserId,
-                displayName: referredUserData.displayName,
-                capital: totalInvested,
-                commissionEarned: commission,
-                status: status,
-            };
+        })
+        .finally(() => {
+            setLoading(false);
         });
-
-        // Use Promise.all to wait for all the user data calculations to complete.
-        // This prevents race conditions and ensures the UI is only updated with complete data.
-        const users = await Promise.all(usersPromises);
-        setReferredUsers(users);
-        setLoading(false);
-      });
-
-      return () => unsubscribe();
     }
-  }, [user]);
+  }, [user, toast]);
 
   const copyToClipboard = () => {
     if (!referralLink) return;
@@ -97,8 +64,9 @@ export default function ReferralsPage() {
       description: "Your referral link has been copied to your clipboard.",
     });
   };
-
-  const totalCommission = referredUsers.reduce((sum, u) => sum + u.commissionEarned, 0);
+  
+  const referredUsers = referralData?.referredUsers || [];
+  const totalCommission = referralData?.totalCommissionEarned || 0;
 
   return (
     <div className="space-y-8">
