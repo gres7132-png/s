@@ -15,10 +15,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 
 // --- Automated Bot Transaction Data ---
-const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Charles", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Dorothy", "Mark", "Sandra", "Paul", "Ashley"];
-const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula", "Akinyi", "Chepkoech", "Muthoni", "Njeri", "Atieno", "Wairimu", "Achieng", "Cherono", "Anyango", "Nyambura"];
+const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Charles", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Dorothy", "Mark", "Sandra", "Paul", "Ashley", "Abdi", "Aisha", "Baraka", "Chacha", "Fatuma", "Juma", "Halima", "Issa", "Zainabu", "Bakari"];
+const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula", "Akinyi", "Chepkoech", "Muthoni", "Njeri", "Atieno", "Wairimu", "Achieng", "Cherono", "Anyango", "Nyambura", "Abdullahi", "Hassan", "Ali", "Omar", "Mohamed"];
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
-const paymentMethods = ["M-PESA", "Bank Transfer", "USDT"];
+const paymentMethods = ["M-PESA", "Bank Transfer"];
 
 interface BotTransaction {
     id: string;
@@ -53,8 +53,8 @@ const generateRandomTransaction = (): BotTransaction => {
     }
     amount = Math.round(amount / 100) * 100;
 
-    const fullCode = generateRandomString(10);
-    const transactionCode = `${fullCode.substring(0, 4)}•••${fullCode.substring(6)}`;
+    const fullCode = `T${generateRandomString(9)}`;
+    const transactionCode = `${fullCode.substring(0, 4)}•••${fullCode.substring(7)}`;
 
 
     return {
@@ -92,7 +92,6 @@ export default function LatestTransactions() {
     switch (method) {
         case "M-PESA": return <Smartphone className="h-4 w-4" />;
         case "Bank Transfer": return <Landmark className="h-4 w-4" />;
-        case "USDT": return <Banknote className="h-4 w-4" />;
         default: return <Banknote className="h-4 w-4" />;
     }
   }
