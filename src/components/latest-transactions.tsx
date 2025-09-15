@@ -13,6 +13,9 @@ import { ArrowDownCircle, ArrowUpCircle, Banknote, Landmark, Smartphone } from "
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, limit } from "firebase/firestore";
+
 
 // --- Automated Bot Transaction Data ---
 
@@ -55,34 +58,41 @@ const generateRandomString = (length: number) => {
     return result;
 }
 
-const generateRandomTransaction = (): BotTransaction => {
-    // Generate a realistic Kenyan name
-    const communityKeys = Object.keys(surnamesByCommunity);
-    const randomCommunityKey = communityKeys[Math.floor(Math.random() * communityKeys.length)];
-    const surnames = surnamesByCommunity[randomCommunityKey as keyof typeof surnamesByCommunity];
+// Function to generate a new bot transaction, now with access to real users
+const generateRandomTransaction = (realUsers: { displayName: string }[] = []): BotTransaction => {
+    let userName = '';
 
-    const firstName = christianNames[Math.floor(Math.random() * christianNames.length)];
-    const lastName = surnames[Math.floor(Math.random() * surnames.length)];
+    // Decide whether to use a real user or generate a bot name (e.g., 20% chance to use a real user)
+    if (realUsers.length > 0 && Math.random() < 0.2) {
+        const randomRealUser = realUsers[Math.floor(Math.random() * realUsers.length)];
+        userName = randomRealUser.displayName;
+    } else {
+        // Fallback to generating a culturally-aware random name
+        const communityKeys = Object.keys(surnamesByCommunity);
+        const randomCommunityKey = communityKeys[Math.floor(Math.random() * communityKeys.length)];
+        const surnames = surnamesByCommunity[randomCommunityKey as keyof typeof surnamesByCommunity];
+        const firstName = christianNames[Math.floor(Math.random() * christianNames.length)];
+        const lastName = surnames[Math.floor(Math.random() * surnames.length)];
+        userName = `${firstName} ${lastName}`;
+    }
 
     const type = transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
     const modeOfPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
     
     let amount;
     if (type === 'Deposit') {
-        amount = Math.floor(Math.random() * (20000 - 3000 + 1) + 3000);
+        amount = Math.random() * (20000 - 3000) + 3000;
     } else {
-        amount = Math.floor(Math.random() * (50000 - 5000 + 1) + 5000);
+        amount = Math.random() * (50000 - 5000) + 5000;
     }
 
     const fullCode = 'TI' + generateRandomString(8);
-    // Mask the transaction code for realism and security feel
     const transactionCode = `${fullCode.substring(0, 3)}...${fullCode.substring(7)}`;
-
 
     return {
         id: new Date().getTime().toString() + Math.random(),
         type: type,
-        userName: `${firstName} ${lastName}`,
+        userName: userName,
         amount: amount,
         timestamp: new Date(),
         modeOfPayment: modeOfPayment,
@@ -94,23 +104,40 @@ const generateRandomTransaction = (): BotTransaction => {
 export default function LatestTransactions() {
   const [transactions, setTransactions] = useState<BotTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [realUsers, setRealUsers] = useState<{ displayName: string }[]>([]);
 
   useEffect(() => {
-    const initialTransactions = Array.from({ length: 5 }, generateRandomTransaction).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
+    // Fetch a sample of real users from Firestore to mix into the feed
+    const usersQuery = query(collection(db, "users"), limit(20));
+    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+        const fetchedUsers: { displayName: string }[] = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.displayName) {
+                fetchedUsers.push({ displayName: data.displayName });
+            }
+        });
+        setRealUsers(fetchedUsers);
+    });
+
+    // Generate initial transactions
+    const initialTransactions = Array.from({ length: 5 }, () => generateRandomTransaction(realUsers)).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
     setTransactions(initialTransactions);
     setLoading(false);
 
-    // This interval creates the "live" feeling
+    // This interval creates the "live" feeling by adding new transactions
     const interval = setInterval(() => {
-      const newTx = generateRandomTransaction();
+      const newTx = generateRandomTransaction(realUsers); // Pass the real users to the generator
       setTransactions(prev => 
-        // Add the new transaction to the top and keep the list at 7 items
         [newTx, ...prev].slice(0, 7)
       );
     }, 5000); // A new transaction appears every 5 seconds
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+        clearInterval(interval);
+        unsubscribeUsers(); // Clean up the Firestore listener
+    };
+  }, [realUsers]); // Rerun effect if realUsers list changes (though it won't much after initial load)
   
   const getPaymentIcon = (method: string) => {
     switch (method) {
@@ -172,7 +199,3 @@ export default function LatestTransactions() {
     </Card>
   );
 }
-
-    
-
-    
