@@ -14,7 +14,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, writeBatch, serverTimestamp, setDoc } from "firebase/firestore";
 
 
 import { Button } from "@/components/ui/button";
@@ -134,6 +134,12 @@ export function AuthForm() {
   async function onSignUpSubmit(values: z.infer<typeof signUpSchema>) {
     setIsLoading(true);
     try {
+      // First, attempt to create the user document with the email as the ID
+      // This will fail if the email is not unique, thanks to our Firestore rule.
+      const userPreviewRef = doc(db, "users", values.email);
+      await setDoc(userPreviewRef, { email: values.email });
+
+      // If the above succeeds, create the user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
@@ -149,9 +155,10 @@ export function AuthForm() {
       // Send verification email
       await sendEmailVerification(newUser);
 
+      // Now, use a batch write to set up the final user documents
       const batch = writeBatch(db);
 
-      // 1. Set the user document
+      // 1. Overwrite the preview doc with the full user document, now using the UID as the ID
       const userDocRef = doc(db, "users", newUser.uid);
       batch.set(userDocRef, {
         firstName: values.firstName,
@@ -171,6 +178,9 @@ export function AuthForm() {
         rechargeAmount: 0,
         withdrawalAmount: 0,
       });
+
+      // 3. Delete the temporary email-based document
+      batch.delete(userPreviewRef);
       
       await batch.commit();
 
@@ -182,11 +192,25 @@ export function AuthForm() {
 
     } catch (error: any) {
       console.error("Sign up error:", error);
-      toast({
-        variant: "destructive",
-        title: "Sign Up Failed",
-        description: error.message || "An unexpected error occurred.",
-      });
+       if (error.code === 'permission-denied') {
+        toast({
+            variant: "destructive",
+            title: "Sign Up Failed",
+            description: "This email address is already in use. Please use a different email.",
+        });
+       } else if (error.code === 'auth/email-already-in-use') {
+         toast({
+            variant: "destructive",
+            title: "Sign Up Failed",
+            description: "This email address is already registered. Please sign in or use a different email.",
+        });
+       } else {
+        toast({
+            variant: "destructive",
+            title: "Sign Up Failed",
+            description: error.message || "An unexpected error occurred.",
+        });
+       }
     } finally {
       setIsLoading(false);
     }

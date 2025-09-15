@@ -1,149 +1,80 @@
 
 rules_version = '2';
 
-// The service cloud.firestore is the database that these rules apply to.
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helper Functions ---
-    // These functions make the rules easier to read and maintain.
-
-    // Checks if the user is authenticated (signed in).
-    function isAuthenticated() {
-      return request.auth != null;
+  
+    // Helper function to check if a user with a given email already exists.
+    function emailExists(email) {
+      return exists(/databases/$(database)/documents/users/$(email));
     }
 
-    // Checks if the user making the request is the owner of the document.
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Checks if the user is an administrator based on their email.
-    // IMPORTANT: This list must be kept in sync with your application code.
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.email in ["gres7132@gmail.com"];
-    }
-
-    // --- User Data (`users` collection) ---
-    // This collection stores basic user profile information like name and email.
     match /users/{userId} {
-      // READ: A user can read their own profile, and admins can read any profile.
-      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      // Anyone can create a user document IF their email is not already in use.
+      // We use the email as the document ID for this check to work efficiently.
+      allow create: if !emailExists(request.resource.data.email);
       
-      // CREATE: A user can create their own profile document (typically at sign-up).
-      allow create: if isOwner(userId);
-      
-      // UPDATE: A user can update their own profile, and admins can update any profile.
-      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
-      
-      // DELETE: Only an admin can delete a user's profile document.
-      allow delete: if isAdmin();
-
-      // --- Nested User Investments (`investments` sub-collection) ---
-      // Each user has a sub-collection for their own investment records.
-      match /investments/{investmentId} {
-        // READ, WRITE (Create, Update, Delete):
-        // A user has full control over their own investments.
-        // Admins have full control over any user's investments.
-        allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
-      }
+      // Logged-in users can read, update, or delete their own document.
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // --- User Financial Statistics (`userStats` collection) ---
-    // This collection is highly sensitive as it stores user balances.
-    match /userStats/{userId} {
-      // READ: A user can read their own stats (to see their balance), and admins can read anyone's.
-      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
-      
-      // CREATE: A user can create their own stats document once (at sign-up).
-      allow create: if isOwner(userId);
-      
-      // UPDATE: CRITICAL RULE - Only an admin can update a user's stats.
-      // This prevents users from changing their own balance from the client-side.
-      // All balance changes must be done via secure backend flows (Genkit) that run with admin privileges.
-      allow update: if isAdmin();
-      
-      // DELETE: Only an admin can delete a user's stats document.
-      allow delete: if isAdmin();
+    match /users/{userId}/{document=**} {
+      // Allow full access for a logged-in user to subcollections within their own user document.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // --- Admin-only collections ---
+    function isAdmin() {
+        // This email MUST match the one in your use-auth.tsx and user-management.ts
+        return request.auth.token.email == "gres7132@gmail.com";
     }
 
-    // --- User Payment Details (`userPaymentDetails` collection) ---
-    // Stores the user's withdrawal information (bank account, crypto address, etc.).
-    match /userPaymentDetails/{userId} {
-      // READ, WRITE (Create, Update, Delete):
-      // A user can manage their own payment details.
-      // Admins can manage any user's payment details.
-      allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
-    }
-
-    // --- Platform-wide Investment Packages (`silverLevelPackages` collection) ---
-    // This data is public-facing but managed only by admins.
     match /silverLevelPackages/{packageId} {
-      // READ: Any authenticated user can read the list of packages.
-      allow read: if isAuthenticated();
-      
-      // WRITE (Create, Update, Delete): Only admins can manage investment packages.
+      // Any authenticated user can read the packages to see what's available.
+      allow read: if request.auth != null;
+      // Only admins can create, update, or delete investment packages.
       allow write: if isAdmin();
     }
-
-    // --- Contributor Tiers (`contributorTiers` collection) ---
-    // Public-facing data managed by admins.
+    
     match /contributorTiers/{tierId} {
-      // READ: Any authenticated user can view the tiers.
-      allow read: if isAuthenticated();
-      
-      // WRITE: Only admins can manage contributor tiers.
-      allow write: if isAdmin();
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
     
-    // --- Commission Tiers (`commissionTiers` collection) ---
-    // Public-facing data managed by admins.
     match /commissionTiers/{tierId} {
-      // READ: Any authenticated user can view the tiers.
-      allow read: if isAuthenticated();
-      
-      // WRITE: Only admins can manage commission tiers.
-      allow write: if isAdmin();
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
 
-    // --- Deposit Proofs (`transactionProofs` collection) ---
-    // Records created by users when they claim to have made a deposit.
+    // --- Transaction & Approval collections ---
+    
+    // Any authenticated user can create proofs/requests. Only admins can read/update them.
     match /transactionProofs/{proofId} {
-      // READ: An admin can read any proof. A user can only read their own.
-      allow read: if isAdmin() || (isAuthenticated() && isOwner(resource.data.userId));
-      
-      // CREATE: Any authenticated user can create a proof for themselves.
-      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
-      
-      // UPDATE, DELETE: Only an admin can update or delete a transaction proof.
-      // This is for approving, rejecting, or cleaning up records.
-      allow update, delete: if isAdmin();
-    }
-
-    // --- Withdrawal Requests (`withdrawalRequests` collection) ---
-    // Records created by users when they want to withdraw funds.
-    match /withdrawalRequests/{reqId} {
-      // READ: An admin can read any request. A user can only read their own.
-      allow read: if isAdmin() || (isAuthenticated() && isOwner(resource.data.userId));
-      
-      // CREATE: Any authenticated user can create a withdrawal request for themselves.
-      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
-      
-      // UPDATE, DELETE: Only an admin can approve, reject, or delete requests.
-      allow update, delete: if isAdmin();
+        allow create: if request.auth != null;
+        allow read, update: if isAdmin();
     }
     
-    // --- Contributor Applications (`contributorApplications` collection) ---
-    // Records for users applying to be Golden Level contributors.
+    match /withdrawalRequests/{reqId} {
+        allow create: if request.auth != null;
+        allow read, update: if isAdmin();
+    }
+
     match /contributorApplications/{appId} {
-    	// READ: An admin can read any application. A user can only read their own.
-      allow read: if isAdmin() || (isAuthenticated() && isOwner(resource.data.userId));
-      
-      // CREATE: Any authenticated user can create an application for themselves.
-      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
-      
-      // UPDATE, DELETE: Only an admin can approve, reject, or delete applications.
-      allow update, delete: if isAdmin();
+        allow create: if request.auth != null;
+        allow read, update: if isAdmin();
+    }
+    
+    // --- User Stats and Payment Details ---
+    match /userStats/{userId} {
+        // A user can read their own stats. Admins can read anyone's stats.
+        allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+        // Writes are handled by secure backend flows, so direct client writes are disallowed.
+        allow write: if false; 
+    }
+    
+    match /userPaymentDetails/{userId} {
+        // A user can manage their own payment details.
+        allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
