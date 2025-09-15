@@ -16,9 +16,9 @@ import { formatDistanceToNow } from 'date-fns';
 
 // --- Automated Bot Transaction Data ---
 // Expanded and more authentic list of Kenyan names
-const firstNames = ["Abdi", "Aisha", "Akinyi", "Ann", "Anthony", "Atieno", "Baraka", "Brenda", "Brian", "Charles", "Chebet", "Chepkoech", "Cherono", "Collins", "Cynthia", "Daniel", "David", "Dennis", "Dorothy", "Elizabeth", "Esther", "Faith", "Fatuma", "Felix", "Grace", "Halima", "Ian", "James", "Jennifer", "Jepchumba", "Jessica", "John", "Joseph", "Juma", "Karen", "Kavindu", "Kevin", "Linda", "Lisa", "Mark", "Mary", "Matthew", "Maureen", "Mercy", "Michael", "Mohamed", "Moses", "Muthoni", "Mwikali", "Nancy", "Nekesa", "Njeri", "Nthenya", "Nyambura", "Omar", "Patricia", "Paul", "Peter", "Richard", "Robert", "Ruth", "Samuel", "Sandra", "Sarah", "Sharon", "Stephen", "Susan", "Thomas", "Vivian", "Wairimu", "Wambui", "Wanjiku", "William", "Zainabu"];
+const firstNames = ["Abdi", "Aisha", "Akinyi", "Ann", "Anthony", "Atieno", "Baraka", "Brenda", "Brian", "Charles", "Chebet", "Chepkoech", "Cherono", "Collins", "Cynthia", "Daniel", "David", "Dennis", "Dorothy", "Elizabeth", "Esther", "Faith", "Fatuma", "Felix", "Grace", "Halima", "Ian", "Imani", "Irene", "Jackline", "Jacob", "James", "Jane", "Janet", "Jennifer", "Jepchumba", "Jerop", "Jessica", "John", "Joseph", "Joshua", "Juma", "Justus", "Karen", "Kavindu", "Kelvin", "Ken", "Kennedy", "Kevin", "Kibet", "Kimani", "Kipchoge", "Kiptoo", "Lilian", "Linda", "Lisa", "Lucy", "Lydia", "Mark", "Martha", "Mary", "Matthew", "Maureen", "Mercy", "Michael", "Michelle", "Mike", "Mohamed", "Moses", "Mumbi", "Muthoni", "Mutinda", "Mwikali", "Nancy", "Naomi", "Nekesa", "Nelson", "Njeri", "Nthenya", "Nyaboke", "Nyambura", "Nzambi", "Ochieng", "Odhiambo", "Okello", "Okoth", "Omar", "Omondi", "Onyango", "Otieno", "Patricia", "Patrick", "Paul", "Peter", "Purity", "Rachel", "Rebecca", "Richard", "Robert", "Rose", "Ruth", "Said", "Samuel", "Sandra", "Sarah", "Sharon", "Sheila", "Simon", "Stacy", "Stanley", "Stephen", "Susan", "Thomas", "Timothy", "Titus", "Victor", "Victoria", "Vincent", "Vivian", "Wairimu", "Wambui", "Wanjiku", "Wanjiru", "Wilfred", "William", "Wycliffe", "Yusuf", "Zainabu", "Zipporah"];
 
-const lastNames = ["Abdullahi", "Achieng", "Adhiambo", "Ali", "Anyango", "Atieno", "Barasa", "Chebet", "Chepkoech", "Cherono", "Githinji", "Gitau", "Hassan", "Kamau", "Kariuki", "Kibet", "Kimani", "Kioko", "Kipkemboi", "Kipkoech", "Kiprotich", "Kipruto", "Maina", "Makokha", "Masinde", "Mbugua", "Mogaka", "Mohamed", "Munyao", "Musyoka", "Mutua", "Muthoni", "Mwangi", "Naliaka", "Njeri", "Njoroge", "Njuguna", "Nyaboke", "Nyaga", "Nyambura", "Nzioka", "Ochieng", "Odhiambo", "Okoth", "Oloo", "Omar", "Onsongo", "Onyango", "Otieno", "Ouma", "Simiyu", "Wachira", "Wafula", "Wairimu", "Wanjala", "Wanjiku"];
+const lastNames = ["Abdullahi", "Achieng", "Adhiambo", "Ali", "Anyango", "Atieno", "Barasa", "Chebet", "Chege", "Chepkoech", "Cherono", "Cheruiyot", "Gacheru", "Gichuhi", "Gikonyo", "Githinji", "Gitonga", "Hassan", "Ibrahim", "Juma", "Kagwe", "Kamau", "Karanja", "Kariuki", "Kasandi", "Kavulavu", "Kibet", "Kimani", "Kimanthi", "Kimutai", "Kinyua", "Kioko", "Kipchumba", "Kipkemboi", "Kipkoech", "Kipkorir", "Kiplagat", "Kiprotich", "Kipruto", "Langat", "Leting", "Maingi", "Maina", "Makokha", "Masinde", "Matasi", "Mbatha", "Mbugua", "Mogaka", "Mohamed", "Mokua", "Muchiri", "Mugo", "Muiruri", "Munyao", "Murage", "Muriithi", "Murithi", "Musyoka", "Mutai", "Muthee", "Muthoni", "Mutiso", "Mutua", "Mwangi", "Mwanza", "Mwendwa", "Naliaka", "Ndambuki", "Ndegwa", "Nderitu", "Ndichu", "Ndungu", "Njeru", "Njeri", "Njogu", "Njoroge", "Njuguna", "Nyaboke", "Nyaga", "Nyambura", "Nyamu", "Nzioka", "Obara", "Obonyo", "Ochieng", "Odhiambo", "Oduor", "Ogutu", "Okello", "Okeyo", "Okoth", "Okumu", "Oloo", "Omar", "Omondi", "Onsongo", "Onyango", "Opio", "Otieno", "Ouma", "Rotich", "Simiyu", "Wachira", "Wafula", "Wairimu", "Waititu", "Wamalwa", "Wambua", "Wambui", "Wanjala", "Wanjiku", "Wanjiru", "Waweru", "Were"];
 
 
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
@@ -58,9 +58,9 @@ const generateRandomTransaction = (): BotTransaction => {
     // Make the amount a round number, which is more realistic
     amount = Math.round(amount / 100) * 100;
 
-    const fullCode = `S${generateRandomString(9)}`;
+    const fullCode = generateRandomString(10);
     // Mask the transaction code for realism and security feel
-    const transactionCode = `${fullCode.substring(0, 4)}...${fullCode.substring(7)}`;
+    const transactionCode = `${fullCode.substring(0, 3)}...${fullCode.substring(7)}`;
 
 
     return {
@@ -156,3 +156,4 @@ export default function LatestTransactions() {
     </Card>
   );
 }
+
