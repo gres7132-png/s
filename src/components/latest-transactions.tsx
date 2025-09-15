@@ -15,8 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 
 // --- Automated Bot Transaction Data ---
-const firstNames = ["James", "John", "David", "Chris", "Mike", "Daniel", "Mark", "Paul", "Kevin", "Brian", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Susan", "Jessica", "Sarah", "Karen", "Nancy"];
-const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula"];
+const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Charles", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Dorothy", "Mark", "Sandra", "Paul", "Ashley"];
+const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula", "Akinyi", "Chepkoech", "Muthoni", "Njeri", "Atieno", "Wairimu", "Achieng", "Cherono", "Anyango", "Nyambura"];
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
 const paymentMethods = ["M-PESA", "Bank Transfer", "USDT"];
 
@@ -53,9 +53,9 @@ const generateRandomTransaction = (): BotTransaction => {
     }
     amount = Math.round(amount / 100) * 100;
 
-    const codePart1 = generateRandomString(3);
-    const codePart2 = generateRandomString(3);
-    const transactionCode = `${codePart1}•••${codePart2}`;
+    const fullCode = generateRandomString(10);
+    const transactionCode = `${fullCode.substring(0, 4)}•••${fullCode.substring(6)}`;
+
 
     return {
         id: new Date().getTime().toString() + Math.random(),
