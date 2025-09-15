@@ -37,7 +37,7 @@ const surnamesByCommunity = {
 
 
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
-const paymentMethods = ["M-PESA", "M-PESA", "M-PESA", "M-PESA", "Bank Transfer", "M-PESA"];
+const paymentMethods = ["M-PESA", "M-PESA", "M-PESA", "M-PESA", "Bank Transfer", "M-PESA", "M-PESA", "M-PESA"];
 
 interface BotTransaction {
     id: string;
@@ -86,15 +86,19 @@ const generateRandomTransaction = (realUsers: { displayName: string }[] = []): B
         amount = Math.random() * (50000 - 5000) + 5000;
     }
 
-    const fullCode = 'TI' + generateRandomString(8);
+    const randomCodePart = generateRandomString(8);
+    const fullCode = 'TI' + randomCodePart;
     const transactionCode = `${fullCode.substring(0, 3)}...${fullCode.substring(7)}`;
+    
+    // Create a timestamp that is slightly in the past to appear more random
+    const timestamp = new Date(new Date().getTime() - Math.random() * 1000 * 60 * 3); // Within the last 3 minutes
 
     return {
         id: new Date().getTime().toString() + Math.random(),
         type: type,
         userName: userName,
         amount: amount,
-        timestamp: new Date(),
+        timestamp: timestamp,
         modeOfPayment: modeOfPayment,
         transactionCode: transactionCode,
     };
@@ -129,7 +133,7 @@ export default function LatestTransactions() {
     const interval = setInterval(() => {
       const newTx = generateRandomTransaction(realUsers); // Pass the real users to the generator
       setTransactions(prev => 
-        [newTx, ...prev].slice(0, 7)
+        [newTx, ...prev].slice(0, 7).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       );
     }, 5000); // A new transaction appears every 5 seconds
 
@@ -199,3 +203,4 @@ export default function LatestTransactions() {
     </Card>
   );
 }
+
