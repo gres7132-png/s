@@ -28,10 +28,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2, Upload } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { updateProfile, verifyBeforeUpdateEmail } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
-import { auth, db, storage } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -44,7 +44,6 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 
 const profileSchema = z.object({
@@ -55,7 +54,6 @@ const profileSchema = z.object({
   age: z.coerce.number().positive("Age must be a positive number.").optional(),
   birthYear: z.coerce.number().gt(1900, "Enter a valid birth year.").optional(),
   bio: z.string().max(160, "Bio must be 160 characters or less.").optional(),
-  photo: z.any().optional(),
 });
 
 
@@ -121,20 +119,10 @@ export default function ProfilePage() {
     setLoading(true);
     try {
         const newDisplayName = `${values.firstName} ${values.lastName}`.trim();
-        let photoURL = user.photoURL;
-
-        // Handle profile photo upload
-        const imageFile = values.photo?.[0];
-        if (imageFile) {
-            const storageRef = ref(storage, `profileImages/${user.uid}`);
-            await uploadBytes(storageRef, imageFile);
-            photoURL = await getDownloadURL(storageRef);
-        }
-      
-        if (newDisplayName !== user.displayName || photoURL !== user.photoURL) {
+        
+        if (newDisplayName !== user.displayName) {
             await updateProfile(user, { 
                 displayName: newDisplayName,
-                photoURL: photoURL,
              });
         }
         
@@ -148,7 +136,7 @@ export default function ProfilePage() {
             phoneNumber: values.phoneNumber,
             age: values.age,
             birthYear: values.birthYear,
-            photoURL: photoURL,
+            photoURL: user.photoURL, // Preserve existing photoURL
         }, { merge: true });
 
       toast({ title: "Profile Updated" });
@@ -286,29 +274,6 @@ export default function ProfilePage() {
                     </Button>
                     </CardFooter>
                 </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Profile Picture</CardTitle>
-                        <CardDescription>
-                            Upload a photo for your public profile avatar.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <FormField control={profileForm.control} name="photo" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Profile Photo</FormLabel>
-                                <FormControl>
-                                    <div className="relative flex items-center gap-2">
-                                        <Input type="file" accept="image/*" className="w-full" onChange={(e) => field.onChange(e.target.files)} />
-                                        <Upload className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                         )} />
-                    </CardContent>
-                </Card>
              </form>
         </Form>
       </div>
@@ -336,3 +301,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
