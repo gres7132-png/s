@@ -43,8 +43,8 @@ const updateBalanceFlow = ai.defineFlow(
     outputSchema: z.object({ success: z.boolean() }),
     auth: { user: true, admin: true }
   },
-  async (input, flow) => {
-    await verifyAdmin(flow);
+  async (input, {auth}) => {
+    await verifyAdmin({auth}); // Pass auth object
     const db = getFirestore();
     const userStatsRef = db.doc(`userStats/${input.userId}`);
     await userStatsRef.set({
@@ -77,8 +77,8 @@ const updateInvestmentFlow = ai.defineFlow(
     outputSchema: z.object({ success: z.boolean() }),
     auth: { user: true, admin: true }
   },
-  async (input, flow) => {
-    await verifyAdmin(flow);
+  async (input, {auth}) => {
+    await verifyAdmin({auth}); // Pass auth object
     const db = getFirestore();
     
     const investmentRef = db.doc(`users/${input.userId}/investments/${input.investmentId}`);
@@ -102,7 +102,7 @@ export const DeleteInvestmentInputSchema = z.object({
     userId: z.string(),
     investmentId: z.string(),
 });
-type DeleteInvestmentInput = z.infer<typeof DeleteInvestmentInputSchema>;
+export type DeleteInvestmentInput = z.infer<typeof DeleteInvestmentInputSchema>;
 
 export async function deleteInvestment(input: DeleteInvestmentInput): Promise<{success: boolean}> {
     return deleteInvestmentFlow(input);
@@ -115,8 +115,8 @@ const deleteInvestmentFlow = ai.defineFlow(
     outputSchema: z.object({ success: z.boolean() }),
     auth: { user: true, admin: true }
   },
-  async (input, flow) => {
-    await verifyAdmin(flow);
+  async (input, {auth}) => {
+    await verifyAdmin({auth}); // Pass auth object
     const db = getFirestore();
     const investmentRef = db.doc(`users/${input.userId}/investments/${input.investmentId}`);
     
@@ -147,8 +147,8 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
     outputSchema: z.object({ success: z.boolean() }),
     auth: { user: true, admin: true },
   },
-  async (input, flow) => {
-    await verifyAdmin(flow);
+  async (input, {auth}) => {
+    await verifyAdmin({auth}); // Pass auth object
     const db = getFirestore();
     const applicationRef = db.doc(`contributorApplications/${input.applicationId}`);
     

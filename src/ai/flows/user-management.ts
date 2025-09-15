@@ -32,15 +32,15 @@ if (!getApps().length) {
 }
 
 // --- Central Admin Verification Helper ---
-export async function verifyAdmin(flow: any) {
+export async function verifyAdmin({ auth: flowAuth }: { auth?: { uid: string } }) {
     if (!getApps().length) {
         throw new Error("Admin SDK is not configured. Check server environment variables.");
     }
-    if (!flow.auth) {
+    if (!flowAuth) {
         throw new Error("Authentication is required.");
     }
     const auth = getAuth();
-    const user = await auth.getUser(flow.auth.uid);
+    const user = await auth.getUser(flowAuth.uid);
     // This list MUST be kept in sync with the one in your firestore.rules
     const ADMIN_EMAILS = ["gres7132@gmail.com"]; 
     if (!user.email || !ADMIN_EMAILS.includes(user.email)) {
@@ -102,10 +102,10 @@ const updateUserStatusFlow = ai.defineFlow(
         outputSchema: z.object({ success: z.boolean() }),
         auth: { user: true, admin: true }
     },
-    async (input, flow) => {
-        await verifyAdmin(flow);
-        const auth = getAuth();
-        await auth.updateUser(input.uid, { disabled: input.disabled });
+    async (input, {auth}) => {
+        await verifyAdmin({auth});
+        const adminAuth = getAuth();
+        await adminAuth.updateUser(input.uid, { disabled: input.disabled });
         return { success: true };
     }
 );
@@ -337,32 +337,41 @@ const investPackageFlow = ai.defineFlow(
     const userId = auth.uid;
     const db = getFirestore();
 
+    const pkgDoc = await db.doc(`silverLevelPackages/${packageId}`).get();
+    if (!pkgDoc.exists) {
+        throw new Error('Investment package not found.');
+    }
+    const pkg = pkgDoc.data()!;
+
+
     await db.runTransaction(async (transaction) => {
       const pkgRef = db.doc(`silverLevelPackages/${packageId}`);
       const userStatsRef = db.doc(`userStats/${userId}`);
       const userRef = db.doc(`users/${userId}`);
 
       // All reads must happen first in a transaction
-      const pkgDoc = await transaction.get(pkgRef);
+      // Re-fetch pkgDoc inside transaction
+      const pkgDocInTransaction = await transaction.get(pkgRef);
       const userStatsDoc = await transaction.get(userStatsRef);
-
-      if (!pkgDoc.exists) {
+      
+      if (!pkgDocInTransaction.exists) {
         throw new Error('Investment package not found.');
       }
-      const pkg = pkgDoc.data()!;
+      const pkgInTransaction = pkgDocInTransaction.data()!;
+
 
       const currentBalance = userStatsDoc.exists() ? userStatsDoc.data()?.availableBalance || 0 : 0;
-      if (currentBalance < pkg.price) {
+      if (currentBalance < pkgInTransaction.price) {
         throw new Error('Insufficient funds to purchase this package.');
       }
 
       // All writes happen after reads
-      transaction.update(userStatsRef, { availableBalance: FieldValue.increment(-pkg.price) });
-      transaction.update(userRef, { hasActiveInvestment: true });
+      transaction.update(userStatsRef, { availableBalance: FieldValue.increment(-pkgInTransaction.price) });
+      transaction.set(userRef, { hasActiveInvestment: true }, { merge: true });
 
       const newInvestmentRef = db.collection(`users/${userId}/investments`).doc();
       transaction.set(newInvestmentRef, {
-        ...pkg,
+        ...pkgInTransaction,
         startDate: Timestamp.now(),
         status: 'active',
       });
@@ -370,13 +379,8 @@ const investPackageFlow = ai.defineFlow(
 
     // After the transaction succeeds, process the referral commission.
     // This is done outside the transaction to avoid contention on the referrer's document.
-    const pkgDoc = await db.doc(`silverLevelPackages/${packageId}`).get();
-    if(pkgDoc.exists) {
-      await processReferral({ investorId: userId, investmentAmount: pkgDoc.data()!.price });
-    }
+    await processReferral({ investorId: userId, investmentAmount: pkg.price });
 
     return { success: true };
   }
 );
-
-    
