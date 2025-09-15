@@ -15,8 +15,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 
 // --- Automated Bot Transaction Data ---
-const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Charles", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Dorothy", "Mark", "Sandra", "Paul", "Ashley", "Abdi", "Aisha", "Baraka", "Chacha", "Fatuma", "Juma", "Halima", "Issa", "Zainabu", "Bakari"];
-const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula", "Akinyi", "Chepkoech", "Muthoni", "Njeri", "Atieno", "Wairimu", "Achieng", "Cherono", "Anyango", "Nyambura", "Abdullahi", "Hassan", "Ali", "Omar", "Mohamed"];
+// Expanded list of Kenyan first names
+const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Charles", "Karen", "Thomas", "Nancy", "Daniel", "Lisa", "Matthew", "Betty", "Anthony", "Dorothy", "Mark", "Sandra", "Paul", "Ashley", "Kevin", "Brian", "Sharon", "Cynthia", "Brenda", "Faith", "Grace", "Mercy", "Peter", "Samuel", "Stephen", "Esther", "Ann", "Ruth", "Moses", "Dennis", "Maureen", "Collins", "Vivian", "Ian", "Felix", "Abdi", "Aisha", "Fatuma", "Halima", "Juma", "Mohamed", "Omar", "Zainabu", "Baraka", "Akinyi", "Adhiambo", "Atieno", "Achieng", "Anyango", "Wanjiku", "Njeri", "Wambui", "Nyambura", "Muthoni", "Wairimu", "Wangari", "Chepkoech", "Cherono", "Chebet", "Jepchumba", "Naliaka", "Nekesa", "Nafula", "Mwikali", "Kavindu", "Nthenya"];
+
+// Expanded list of Kenyan last names
+const lastNames = ["Mwangi", "Otieno", "Kariuki", "Kimani", "Wanjala", "Njoroge", "Ochieng", "Maina", "Kamau", "Wafula", "Akinyi", "Chepkoech", "Muthoni", "Njeri", "Atieno", "Wairimu", "Achieng", "Cherono", "Anyango", "Nyambura", "Abdullahi", "Hassan", "Ali", "Omar", "Mohamed", "Onyango", "Odhiambo", "Okoth", "Oloo", "Ouma", "Kipruto", "Kiprotich", "Kipkoech", "Kipkemboi", "Kibet", "Mutua", "Musyoka", "Munyao", "Kioko", "Nzioka", "Nyaga", "Mbugua", "Githinji", "Njuguna", "Gitau", "Wachira", "Simiyu", "Barasa", "Masinde", "Makokha", "Nyaboke", "Mogaka", "Onsongo"];
+
+
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
 const paymentMethods = ["M-PESA", "Bank Transfer"];
 
@@ -62,7 +67,7 @@ const generateRandomTransaction = (): BotTransaction => {
     return {
         id: new Date().getTime().toString() + Math.random(),
         type: type,
-        userName: `${firstName} ${lastName.charAt(0)}.`,
+        userName: `${firstName} ${lastName}`,
         amount: amount,
         timestamp: new Date(),
         modeOfPayment: modeOfPayment,
