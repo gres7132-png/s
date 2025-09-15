@@ -238,4 +238,203 @@ export default function UserDetailsPage({ params }: { params: { userId: string }
       });
       toast({ title: "Investment Updated" });
       setEditingInvestment(null);
-    } catch (e: any
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update Failed", description: e.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteInvestment = async (investmentId: string) => {
+     setActionLoading(true);
+     try {
+        await deleteInvestment({ userId, investmentId });
+        toast({ title: "Investment Deleted" });
+     } catch (e: any) {
+        toast({ variant: "destructive", title: "Delete Failed", description: e.message });
+     } finally {
+        setActionLoading(false);
+     }
+  };
+
+  const getInitials = (name?: string) => {
+    return name ? name.split(' ').map(n => n[0]).join('') : 'U';
+  }
+
+  if (authLoading || loading) {
+    return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+  
+  if (!isAdmin) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+            <ShieldAlert className="h-12 w-12 text-destructive" />
+            <h1 className="text-2xl font-bold mt-4">Access Denied</h1>
+            <p className="text-muted-foreground">You do not have permission to view this page.</p>
+        </div>
+    );
+  }
+
+  return (
+    <>
+    <div className="space-y-8">
+       {/* User Header */}
+       <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16 border-2">
+                <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} />
+                <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
+            </Avatar>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                    {user?.displayName || "Unnamed User"}
+                    {user?.disabled && <Badge variant="destructive">Suspended</Badge>}
+                </h1>
+                <p className="text-muted-foreground">{user?.email}</p>
+                <p className="text-xs text-muted-foreground font-mono mt-1">{user?.uid}</p>
+            </div>
+            <div className="ml-auto">
+                 <Button onClick={handleToggleSuspend} disabled={actionLoading} variant={user?.disabled ? "outline" : "destructive"}>
+                    {actionLoading ? <Loader2 className="animate-spin" /> : (user?.disabled ? <><CheckCircle className="mr-2 h-4 w-4" />Reactivate</> : <><Ban className="mr-2 h-4 w-4" />Suspend</>)}
+                 </Button>
+            </div>
+        </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Admin Controls</AlertTitle>
+          <AlertDescription>
+              Changes made here directly affect the user's account and balance. Proceed with caution.
+          </AlertDescription>
+        </Alert>
+
+
+        <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 space-y-8">
+                {/* Stats Cards */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Account Stats</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex justify-between items-center"><span className="text-muted-foreground">Today's Earnings</span><span className="font-bold">{stats ? formatCurrency(stats.todaysEarnings) : <Skeleton className="h-5 w-16" />}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-muted-foreground">Total Deposits</span><span className="font-bold">{stats ? formatCurrency(stats.rechargeAmount) : <Skeleton className="h-5 w-16" />}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-muted-foreground">Total Withdrawals</span><span className="font-bold">{stats ? formatCurrency(stats.withdrawalAmount) : <Skeleton className="h-5 w-16" />}</span></div>
+                    </CardContent>
+                </Card>
+
+                 {/* Balance Form */}
+                <Card>
+                    <Form {...balanceForm}>
+                        <form onSubmit={balanceForm.handleSubmit(onBalanceSubmit)}>
+                            <CardHeader>
+                                <CardTitle>Manage Balance</CardTitle>
+                                <CardDescription>Directly edit the user's available balance.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <FormField control={balanceForm.control} name="availableBalance" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Available Balance (KES)</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input type="number" {...field} className="pl-8" />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                            </CardContent>
+                            <CardFooter>
+                                <Button type="submit" disabled={actionLoading}>
+                                    {actionLoading ? <Loader2 className="animate-spin" /> : "Save Balance"}
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Form>
+                </Card>
+            </div>
+
+            <div className="lg:col-span-2">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>User Investments</CardTitle>
+                        <CardDescription>View and manage all active and completed investments for this user.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Price</TableHead>
+                                    <TableHead>Daily Return</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {investments.length > 0 ? investments.map(inv => (
+                                    <TableRow key={inv.id}>
+                                        <TableCell className="font-medium">{inv.name}</TableCell>
+                                        <TableCell>{formatCurrency(inv.price)}</TableCell>
+                                        <TableCell>{formatCurrency(inv.dailyReturn)}</TableCell>
+                                        <TableCell><Badge variant={inv.status === 'active' ? 'default' : 'secondary'}>{inv.status}</Badge></TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" onClick={() => handleEditInvestment(inv)}><Pencil className="h-4 w-4" /></Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80"><Trash2 className="h-4 w-4" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the investment and cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteInvestment(inv.id)}>Delete</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No investments found.</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    </div>
+    
+     {/* Edit Investment Dialog */}
+      <Dialog open={!!editingInvestment} onOpenChange={(open) => !open && setEditingInvestment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Investment: {editingInvestment?.name}</DialogTitle>
+            <DialogDescription>
+              Modify the properties of this investment. This will affect future earnings calculations.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...investmentForm}>
+            <form id="investment-edit-form" onSubmit={investmentForm.handleSubmit(handleUpdateInvestment)} className="space-y-4 py-4">
+              <FormField control={investmentForm.control} name="price" render={({ field }) => (
+                <FormItem><FormLabel>Price (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={investmentForm.control} name="dailyReturn" render={({ field }) => (
+                <FormItem><FormLabel>Daily Return (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={investmentForm.control} name="status" render={({ field }) => (
+                <FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+              )} />
+            </form>
+          </Form>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingInvestment(null)}>Cancel</Button>
+            <Button type="submit" form="investment-edit-form" disabled={actionLoading}>
+              {actionLoading ? <Loader2 className="animate-spin" /> : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </>
+  )
+}

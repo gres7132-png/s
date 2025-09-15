@@ -1,80 +1,97 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Helper function to check if a user with a given email already exists.
-    function emailExists(email) {
-      return exists(/databases/$(database)/documents/users/$(email));
+    // Helper function to check for email uniqueness
+    function isEmailUnique(email) {
+      return !exists(/databases/$(database)/documents/users/$(email));
     }
-
+    
+    // --- User Data Rules ---
     match /users/{userId} {
-      // Anyone can create a user document IF their email is not already in use.
-      // We use the email as the document ID for this check to work efficiently.
-      allow create: if !emailExists(request.resource.data.email);
-      
-      // Logged-in users can read, update, or delete their own document.
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Anyone can create their own user document during sign-up
+      // The email address itself is used as a temporary document ID to check for uniqueness
+      allow create: if request.auth != null && 
+                       request.auth.token.email == request.resource.data.email &&
+                       isEmailUnique(request.resource.data.email);
+
+      // Logged-in users can only read or update their own data.
+      // Admin users can read any user's data.
+      allow read, update: if request.auth != null && (
+                            request.auth.uid == userId ||
+                            request.auth.token.email in ["gres7132@gmail.com"]
+                          );
+                          
+       // No one can delete user documents directly.
+      allow delete: if false;
+
+      // --- Subcollections ---
+      match /investments/{investmentId} {
+        // Users can read their own investments. Admins can read anyone's.
+         allow read: if request.auth != null && (
+                      request.auth.uid == userId ||
+                      request.auth.token.email in ["gres7132@gmail.com"]
+                    );
+        // Only backend (admin) flows can create, update, or delete investments.
+        allow write: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"];
+      }
     }
 
-    match /users/{userId}/{document=**} {
-      // Allow full access for a logged-in user to subcollections within their own user document.
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // --- Admin-only collections ---
-    function isAdmin() {
-        // This email MUST match the one in your use-auth.tsx and user-management.ts
-        return request.auth.token.email == "gres7132@gmail.com";
-    }
-
-    match /silverLevelPackages/{packageId} {
-      // Any authenticated user can read the packages to see what's available.
-      allow read: if request.auth != null;
-      // Only admins can create, update, or delete investment packages.
-      allow write: if isAdmin();
-    }
-    
-    match /contributorTiers/{tierId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
-    }
-    
-    match /commissionTiers/{tierId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
-    }
-
-    // --- Transaction & Approval collections ---
-    
-    // Any authenticated user can create proofs/requests. Only admins can read/update them.
-    match /transactionProofs/{proofId} {
-        allow create: if request.auth != null;
-        allow read, update: if isAdmin();
-    }
-    
-    match /withdrawalRequests/{reqId} {
-        allow create: if request.auth != null;
-        allow read, update: if isAdmin();
-    }
-
-    match /contributorApplications/{appId} {
-        allow create: if request.auth != null;
-        allow read, update: if isAdmin();
-    }
-    
-    // --- User Stats and Payment Details ---
+    // --- User Stats Rules ---
     match /userStats/{userId} {
-        // A user can read their own stats. Admins can read anyone's stats.
-        allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
-        // Writes are handled by secure backend flows, so direct client writes are disallowed.
-        allow write: if false; 
+      // Users can read their own stats. Admins can read anyone's.
+      allow read: if request.auth != null && (
+                      request.auth.uid == userId ||
+                      request.auth.token.email in ["gres7132@gmail.com"]
+                  );
+      // Only backend (admin) flows can write to user stats.
+      allow write: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"];
     }
-    
-    match /userPaymentDetails/{userId} {
-        // A user can manage their own payment details.
+
+    // --- User Payment Details Rules ---
+     match /userPaymentDetails/{userId} {
+        // Users can read and write to their own payment details.
         allow read, write: if request.auth != null && request.auth.uid == userId;
+     }
+
+    // --- Publicly Readable Data ---
+    match /silverLevelPackages/{packageId} {
+      allow read: if true; // Anyone can read investment packages
+      allow write: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"]; // Only admins can modify
+    }
+    match /contributorTiers/{tierId} {
+       allow read: if true; // Anyone can read contributor tiers
+       allow write: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"]; // Only admins can modify
+    }
+    match /commissionTiers/{tierId} {
+       allow read: if true; // Anyone can read commission tiers
+       allow write: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"]; // Only admins can modify
+    }
+
+    // --- Admin-Only Writable Collections ---
+    // These collections are for processing requests from users.
+    // The documents are created by users but can only be modified by admins via backend flows.
+    match /transactionProofs/{proofId} {
+        // Logged-in users can create proofs
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        // Admins can read and update (approve/reject)
+        allow read, update: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"];
+        allow delete: if false;
+    }
+     match /withdrawalRequests/{requestId} {
+        // Logged-in users can create requests
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        // Admins can read and update (approve/reject)
+        allow read, update: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"];
+        allow delete: if false;
+    }
+    match /contributorApplications/{applicationId} {
+        // Logged-in users can create applications
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        // Admins can read and update (approve/reject)
+        allow read, update: if request.auth != null && request.auth.token.email in ["gres7132@gmail.com"];
+        allow delete: if false;
     }
   }
 }

@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import placeholderImages from '@/lib/placeholder-images.json';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import LiveMiningStats from "@/components/live-mining-stats";
 
 
 export default function WebstitePage() {
@@ -150,9 +151,12 @@ export default function WebstitePage() {
                  </div>
             </div>
         </section>
+        
+        {/* Live Mining Stats Section */}
+        <LiveMiningStats />
 
          {/* Why Choose Us Section */}
-        <section className="py-16 md:py-24 bg-background">
+        <section className="py-16 md:py-24 bg-secondary/50">
             <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
                  <div className="order-last md:order-first">
                     <Image
@@ -185,7 +189,7 @@ export default function WebstitePage() {
         </section>
 
         {/* Contributor Program Section */}
-        <section id="contributor" className="py-16 md:py-24 bg-secondary/50">
+        <section id="contributor" className="py-16 md:py-24 bg-background">
             <div className="container mx-auto px-4 text-center">
                 <div className="space-y-4 mb-12">
                      <h2 className="text-3xl font-bold tracking-tight">Become a Golden Level Contributor</h2>
@@ -223,7 +227,7 @@ export default function WebstitePage() {
         </section>
 
         {/* Agent Commission Section */}
-        <section id="commissions" className="py-16 md:py-24 bg-background">
+        <section id="commissions" className="py-16 md:py-24 bg-secondary/50">
             <div className="container mx-auto px-4 text-center">
                  <div className="space-y-4 mb-12">
                      <h2 className="text-3xl font-bold tracking-tight">Agent Commission Program</h2>
@@ -244,7 +248,7 @@ export default function WebstitePage() {
         </section>
 
         {/* FAQ Section */}
-        <section id="faq" className="py-16 md:py-24 bg-secondary/50">
+        <section id="faq" className="py-16 md:py-24 bg-background">
              <div className="container mx-auto px-4 max-w-3xl">
                 <div className="text-center space-y-4 mb-12">
                      <h2 className="text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
@@ -266,7 +270,7 @@ export default function WebstitePage() {
         </section>
         
         {/* Call to Action Section */}
-        <section className="py-20 md:py-32 bg-background">
+        <section className="py-20 md:py-32 bg-secondary/50">
             <div className="container mx-auto px-4 text-center">
                  <h2 className="text-3xl font-bold tracking-tight">Ready to Start Earning?</h2>
                  <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground">
