@@ -9,7 +9,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { streamText } from 'genkit/ai';
 
 export const AssistantInputSchema = z.string();
 export type AssistantInput = z.infer<typeof AssistantInputSchema>;
@@ -64,7 +63,7 @@ export const assistantFlow = ai.defineFlow(
     outputSchema: z.string(),
   },
   async (query) => {
-    const { stream, response } = await ai.generateStream({
+    const { stream, response } = ai.generateStream({
       model: 'googleai/gemini-1.5-flash-preview',
       prompt: [
         { role: 'system', content: assistantPrompt },
@@ -84,7 +83,7 @@ export const assistantFlow = ai.defineFlow(
 
 // This function will be used by the client to stream the response
 export async function askAssistant(query: string) {
-    return await streamText({
+    const { stream } = ai.generateStream({
         model: 'googleai/gemini-1.5-flash-preview',
         prompt: [
             { role: 'system', content: assistantPrompt },
@@ -92,4 +91,16 @@ export async function askAssistant(query: string) {
         ],
         config: { temperature: 0.3 },
     });
+
+    // Transform the Genkit stream into a simple text stream
+    const textStream = new ReadableStream({
+        async start(controller) {
+            for await (const chunk of stream) {
+                controller.enqueue(chunk.text);
+            }
+            controller.close();
+        }
+    });
+
+    return textStream;
 }
