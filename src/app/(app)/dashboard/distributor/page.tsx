@@ -36,7 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, where, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { applyForContributorTier } from "@/ai/flows/user-management";
 import { getContributorData } from "@/ai/flows/get-user-data";
 import type { ContributorData } from "@/ai/flows/get-user-data";
@@ -74,48 +74,25 @@ export default function DistributorPage() {
         console.error("Error fetching tiers:", error);
         setLoadingTiers(false);
     });
-
-    return () => unsubscribeTiers();
-  }, []);
-
-  useEffect(() => {
+    
     if (user) {
         setLoadingData(true);
-        // This is now a real-time listener. We don't need a separate flow.
-        const userStatsRef = doc(db, "userStats", user.uid);
-        const referralsQuery = query(
-            collection(db, "users"),
-            where("referredBy", "==", user.uid),
-            where("hasActiveInvestment", "==", true)
-        );
-
-        let balance = 0;
-        let activeReferrals = 0;
-
-        const updateData = () => {
-             setContributorData({ 
-                userBalance: balance,
-                activeReferralsCount: activeReferrals,
-             });
-             setLoadingData(false);
+        const fetchPrereqData = async () => {
+            try {
+                const data = await getContributorData();
+                setContributorData(data);
+            } catch (error) {
+                console.error("Failed to fetch contributor data:", error);
+                toast({ variant: "destructive", title: "Error", description: "Could not load prerequisite data." });
+            } finally {
+                setLoadingData(false);
+            }
         };
-        
-        const unsubStats = onSnapshot(userStatsRef, (doc) => {
-            balance = doc.exists() ? doc.data()?.availableBalance || 0 : 0;
-            updateData();
-        });
-
-        const unsubReferrals = onSnapshot(referralsQuery, (snapshot) => {
-            activeReferrals = snapshot.size;
-            updateData();
-        });
-        
-        return () => {
-            unsubStats();
-            unsubReferrals();
-        };
+        fetchPrereqData();
     }
-  }, [user]);
+
+    return () => unsubscribeTiers();
+  }, [user, toast]);
   
   const handleApplyClick = (tier: ContributorTier) => {
     if (!contributorData || contributorData.userBalance < tier.deposit) {
@@ -265,3 +242,5 @@ export default function DistributorPage() {
     </>
   );
 }
+
+    

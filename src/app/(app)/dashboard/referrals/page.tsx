@@ -25,8 +25,9 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where, getDocs, collectionGroup } from "firebase/firestore";
+import { getReferralData } from "@/ai/flows/get-user-data";
+import type { ReferralData } from "@/ai/flows/get-user-data";
+
 
 interface ReferredUser {
   id: string;
@@ -46,40 +47,22 @@ export default function ReferralsPage() {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
       
-      const referralsQuery = query(collection(db, "users"), where("referredBy", "==", user.uid));
+      const fetchReferralData = async () => {
+        try {
+          const data: ReferralData = await getReferralData();
+          setReferredUsers(data.referredUsers);
+        } catch (error) {
+          console.error("Failed to get referral data:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not load your referral information." });
+          setReferredUsers([]); // Fail gracefully
+        } finally {
+          setLoading(false);
+        }
+      };
       
-      const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
-        setLoading(true);
-        const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        const usersWithCapital = await Promise.all(users.map(async (refUser) => {
-            const investmentsColRef = collection(db, `users/${refUser.id}/investments`);
-            const investmentsSnapshot = await getDocs(investmentsColRef);
-            
-            let totalInvested = 0;
-            investmentsSnapshot.forEach(investmentDoc => {
-                totalInvested += investmentDoc.data().price || 0;
-            });
-            
-            return {
-                id: refUser.id,
-                displayName: refUser.displayName || 'Unknown User',
-                capital: totalInvested,
-                status: totalInvested > 0 ? 'Active' : 'Pending' as 'Active' | 'Pending',
-            };
-        }));
-        
-        setReferredUsers(usersWithCapital);
-        setLoading(false);
-      }, (error) => {
-        console.error("Failed to get referral data in real-time:", error);
-        setReferredUsers([]); // Fail gracefully
-        setLoading(false);
-      });
-      
-      return () => unsubscribe();
+      fetchReferralData();
     }
-  }, [user]);
+  }, [user, toast]);
 
   const copyToClipboard = () => {
     if (!referralLink) return;
@@ -183,3 +166,5 @@ export default function ReferralsPage() {
     </div>
   );
 }
+
+    

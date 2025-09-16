@@ -85,7 +85,7 @@ const getReferralDataFlow = ai.defineFlow(
             displayName: referredUserData.displayName || 'Unknown User',
             capital: totalInvested,
             commissionEarned: commission,
-            status: totalInvested > 0 ? 'Active' : 'Pending' as 'Active' | 'Pending',
+            status: referredUserData.hasActiveInvestment ? 'Active' : 'Pending' as 'Active' | 'Pending',
         };
     }));
 
@@ -146,3 +146,5 @@ const getContributorDataFlow = ai.defineFlow(
     };
   }
 );
+
+    
