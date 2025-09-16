@@ -91,7 +91,7 @@ export default function WalletPage() {
     amount: z.coerce
         .number()
         .positive({ message: "Amount must be positive." })
-        .min(1000, { message: `Minimum withdrawal is ${formatCurrency(1000)}.` })
+        .min(60, { message: `Minimum withdrawal is ${formatCurrency(60)}.` })
         .max(withdrawableBalance, { message: `Amount exceeds withdrawable balance of ${formatCurrency(withdrawableBalance)}.` }),
     });
 
@@ -566,5 +566,3 @@ export default function WalletPage() {
     </div>
   );
 }
-
-    

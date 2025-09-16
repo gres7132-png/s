@@ -42,7 +42,7 @@ If a user asks where to perform a certain task, guide them to the correct page b
 
 *   **Withdrawals & Deposits:**
     -   **Deposits:** To deposit, users must make a payment to the company's provided Mobile Money, Minipay, or Crypto addresses. After payment, they must submit a deposit proof (amount and transaction ID) in the "Wallet" section for verification.
-    -   **Withdrawals:** Users can request a withdrawal from their available balance. The minimum withdrawal is KES 1,000.
+    -   **Withdrawals:** Users can request a withdrawal from their available balance. The minimum withdrawal is KES 60.
     -   **Fees:** A 15% service fee is applied to all withdrawals to cover operational costs.
     -   **Tax-Free Day:** The withdrawal service fee is WAIVED on the 23rd of every month.
 

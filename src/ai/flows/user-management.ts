@@ -60,7 +60,7 @@ export type UpdateUserStatusInput = z.infer<typeof UpdateUserStatusInputSchema>;
 
 
 const WithdrawalRequestInputSchema = z.object({
-  amount: z.number().min(1000, "Minimum withdrawal is KES 1,000."),
+  amount: z.number().min(60, "Minimum withdrawal is KES 60."),
   paymentDetails: z.any().describe("The user's saved payment details object."),
 });
 type WithdrawalRequestInput = z.infer<typeof WithdrawalRequestInputSchema>;
