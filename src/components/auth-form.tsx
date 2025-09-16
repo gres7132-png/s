@@ -14,7 +14,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, writeBatch, serverTimestamp, setDoc } from "firebase/firestore";
 
 
 import { Button } from "@/components/ui/button";
@@ -178,12 +178,9 @@ export function AuthForm() {
         rechargeAmount: 0,
         withdrawalAmount: 0,
       });
-<<<<<<< HEAD
 
       // 3. Delete the temporary email-based document
       batch.delete(userPreviewRef);
-=======
->>>>>>> refs/remotes/origin/main
       
       await batch.commit();
 
