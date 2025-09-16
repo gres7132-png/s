@@ -153,13 +153,13 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
     const db = getFirestore();
     const applicationRef = db.doc(`contributorApplications/${input.applicationId}`);
     
-    const applicationDoc = await applicationRef.get();
-    if (!applicationDoc.exists) {
-      throw new Error('Application not found.');
-    }
-    
     await db.runTransaction(async (transaction) => {
       // READ must come first in a transaction
+      const applicationDoc = await transaction.get(applicationRef);
+      if (!applicationDoc.exists) {
+        throw new Error('Application not found.');
+      }
+      
       const appData = applicationDoc.data();
       const userId = appData?.userId;
       
@@ -167,10 +167,10 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
         const depositAmount = appData?.depositAmount;
         if (depositAmount && depositAmount > 0) {
             const userStatsRef = db.doc(`userStats/${userId}`);
-            // If rejected, refund the deposit.
-            transaction.update(userStatsRef, {
+            // If rejected, refund the deposit using a secure atomic increment.
+            transaction.set(userStatsRef, {
                 availableBalance: FieldValue.increment(depositAmount),
-            });
+            }, { merge: true });
         }
       }
       
@@ -206,6 +206,7 @@ const approveDepositFlow = ai.defineFlow(
     const proofRef = db.doc(`transactionProofs/${proofId}`);
     
     let depositorId = '';
+    let depositorReferredBy: string | null = null;
 
     // --- Step 1: Run transaction to approve deposit and credit user ---
     await db.runTransaction(async (transaction) => {
@@ -219,13 +220,16 @@ const approveDepositFlow = ai.defineFlow(
         
         depositorId = proofData.userId;
         if (!depositorId) throw new Error("User ID not found on deposit proof.");
+
+        const userDoc = await transaction.get(db.doc(`users/${depositorId}`));
+        depositorReferredBy = userDoc.data()?.referredBy || null;
         
         const userStatsRef = db.doc(`userStats/${depositorId}`);
         
         // Approve the proof
         transaction.update(proofRef, { status: 'approved', amount: verifiedAmount });
         
-        // Credit the user's balance using atomic increments
+        // Credit the user's balance using atomic increments for production-ready safety
         transaction.set(userStatsRef, {
             availableBalance: FieldValue.increment(verifiedAmount),
             rechargeAmount: FieldValue.increment(verifiedAmount),
@@ -237,22 +241,19 @@ const approveDepositFlow = ai.defineFlow(
     }
     
     // --- Step 2: Handle referral commission outside the main transaction ---
-    const userDoc = await db.doc(`users/${depositorId}`).get();
-    const referrerId = userDoc.data()?.referredBy;
-    
-    if (referrerId) {
+    // This is safe to do outside the transaction because we're using atomic increments.
+    if (depositorReferredBy) {
         const commissionAmount = verifiedAmount * 0.05; // 5% commission
         if (commissionAmount > 0) {
-            const referrerStatsRef = db.doc(`userStats/${referrerId}`);
+            const referrerStatsRef = db.doc(`userStats/${depositorReferredBy}`);
             try {
-                // Use atomic increment for the referrer's balance as well.
-                // This is safe from race conditions.
+                // Use a secure atomic increment for the referrer's balance.
                 await referrerStatsRef.set({
                     availableBalance: FieldValue.increment(commissionAmount),
                 }, { merge: true });
-                console.log(`Awarded KES ${commissionAmount} commission to referrer ${referrerId} for deposit ${proofId}.`);
+                console.log(`Awarded KES ${commissionAmount} commission to referrer ${depositorReferredBy} for deposit ${proofId}.`);
             } catch (error) {
-                console.error(`Failed to award commission to referrer ${referrerId}. Error: ${error}`);
+                console.error(`Failed to award commission to referrer ${depositorReferredBy}. Error: ${error}`);
                 // Don't throw error, main operation succeeded. Log for manual correction.
             }
         }
