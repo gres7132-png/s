@@ -44,11 +44,9 @@ export default function ReferralsPage() {
           setReferralData(data);
         } catch (err: any) {
           console.error("Failed to get referral data:", err);
-          toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Could not load your referral information. " + err.message,
-          });
+          // Gracefully fail by setting empty data.
+          // The backend already handles commission payouts separately.
+          setReferralData({ referredUsers: [], totalCommissionEarned: 0 });
         } finally {
             setLoading(false);
         }
