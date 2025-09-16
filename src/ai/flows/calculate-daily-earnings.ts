@@ -87,7 +87,7 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
         
         creditBatch.set(userStatsRef, {
             availableBalance: FieldValue.increment(dailyEarning),
-            todaysEarnings: dailyEarning // This is a set, not increment, as we reset to 0 just before.
+            todaysEarnings: FieldValue.increment(dailyEarning) // This is now an increment as we reset to 0 just before.
         }, { merge: true });
         
         totalCredited += dailyEarning;
