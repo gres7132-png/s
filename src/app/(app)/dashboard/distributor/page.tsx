@@ -38,6 +38,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, where, doc } from "firebase/firestore";
 import { applyForContributorTier } from "@/ai/flows/user-management";
+import { getContributorData } from "@/ai/flows/get-user-data";
+import type { ContributorData } from "@/ai/flows/get-user-data";
+
 
 interface ContributorTier {
   id: string;
@@ -47,10 +50,6 @@ interface ContributorTier {
   deposit: number;
 }
 
-interface ContributorData {
-    activeReferralsCount: number;
-    userBalance: number;
-}
 
 export default function DistributorPage() {
   const { toast } = useToast();
@@ -82,38 +81,38 @@ export default function DistributorPage() {
   useEffect(() => {
     if (user) {
         setLoadingData(true);
-
-        // Listener for active referrals
+        // This is now a real-time listener. We don't need a separate flow.
+        const userStatsRef = doc(db, "userStats", user.uid);
         const referralsQuery = query(
             collection(db, "users"),
             where("referredBy", "==", user.uid),
             where("hasActiveInvestment", "==", true)
         );
-        const unsubscribeReferrals = onSnapshot(referralsQuery, (snapshot) => {
-            setContributorData(prev => ({ ...prev, activeReferralsCount: snapshot.size } as ContributorData));
-        }, (error) => {
-            console.error("Error fetching active referrals:", error);
-            setContributorData(prev => ({ ...prev, activeReferralsCount: 0 } as ContributorData));
+
+        let balance = 0;
+        let activeReferrals = 0;
+
+        const updateData = () => {
+             setContributorData({ 
+                userBalance: balance,
+                activeReferralsCount: activeReferrals,
+             });
+             setLoadingData(false);
+        };
+        
+        const unsubStats = onSnapshot(userStatsRef, (doc) => {
+            balance = doc.exists() ? doc.data()?.availableBalance || 0 : 0;
+            updateData();
         });
 
-        // Listener for user balance
-        const userStatsRef = doc(db, "userStats", user.uid);
-        const unsubscribeStats = onSnapshot(userStatsRef, (doc) => {
-             if (doc.exists()) {
-                setContributorData(prev => ({ ...prev, userBalance: doc.data().availableBalance || 0 } as ContributorData));
-            } else {
-                 setContributorData(prev => ({ ...prev, userBalance: 0 } as ContributorData));
-            }
-        }, (error) => {
-            console.error("Error fetching user balance:", error);
-            setContributorData(prev => ({ ...prev, userBalance: 0 } as ContributorData));
+        const unsubReferrals = onSnapshot(referralsQuery, (snapshot) => {
+            activeReferrals = snapshot.size;
+            updateData();
         });
         
-        setLoadingData(false);
-
         return () => {
-            unsubscribeReferrals();
-            unsubscribeStats();
+            unsubStats();
+            unsubReferrals();
         };
     }
   }, [user]);
