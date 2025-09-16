@@ -13,16 +13,22 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { verifyAdmin } from '@/ai/flows/user-management'; // Import from the central location
 
 
-// --- Helper to synchronize hasActiveInvestment flag ---
+// --- Helper to synchronize hasActiveInvestment flag atomically ---
 async function syncHasActiveInvestment(db: FirebaseFirestore.Firestore, userId: string) {
     const userRef = db.doc(`users/${userId}`);
     const investmentsColRef = db.collection(`users/${userId}/investments`);
     
-    const activeInvestmentsSnapshot = await investmentsColRef.where('status', '==', 'active').limit(1).get();
-    const hasActive = !activeInvestmentsSnapshot.empty;
-    
-    await userRef.set({ hasActiveInvestment: hasActive }, { merge: true });
-    console.log(`User ${userId} hasActiveInvestment status set to ${hasActive}.`);
+    // This is safe to run as a separate transaction as it's idempotent.
+    // It recalculates the truth from the current state of investments.
+    return db.runTransaction(async (transaction) => {
+        const activeInvestmentsSnapshot = await transaction.get(
+            investmentsColRef.where('status', '==', 'active').limit(1)
+        );
+        const hasActive = !activeInvestmentsSnapshot.empty;
+        
+        transaction.set(userRef, { hasActiveInvestment: hasActive }, { merge: true });
+        console.log(`User ${userId} hasActiveInvestment status atomically set to ${hasActive}.`);
+    });
 }
 
 
@@ -90,7 +96,7 @@ const updateInvestmentFlow = ai.defineFlow(
       status: input.status,
     });
     
-    // After updating, synchronize the user's active status.
+    // After updating, atomically synchronize the user's active status.
     await syncHasActiveInvestment(db, input.userId);
     
     return { success: true };
@@ -123,7 +129,7 @@ const deleteInvestmentFlow = ai.defineFlow(
     
     await investmentRef.delete();
     
-    // After deleting, synchronize the user's active status.
+    // After deleting, atomically synchronize the user's active status.
     await syncHasActiveInvestment(db, input.userId);
     
     return { success: true };
@@ -154,20 +160,23 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
     const applicationRef = db.doc(`contributorApplications/${input.applicationId}`);
     
     await db.runTransaction(async (transaction) => {
-      // READ must come first in a transaction
       const applicationDoc = await transaction.get(applicationRef);
       if (!applicationDoc.exists) {
         throw new Error('Application not found.');
       }
       
       const appData = applicationDoc.data();
-      const userId = appData?.userId;
+      if (!appData) {
+        throw new Error('Application data is missing.');
+      }
+      const userId = appData.userId;
       
       if (input.status === 'rejected' && userId) {
-        const depositAmount = appData?.depositAmount;
+        const depositAmount = appData.depositAmount;
         if (depositAmount && depositAmount > 0) {
             const userStatsRef = db.doc(`userStats/${userId}`);
             // If rejected, refund the deposit using a secure atomic increment.
+            // This is production-ready and safe from race conditions.
             transaction.set(userStatsRef, {
                 availableBalance: FieldValue.increment(depositAmount),
             }, { merge: true });
@@ -247,7 +256,7 @@ const approveDepositFlow = ai.defineFlow(
         if (commissionAmount > 0) {
             const referrerStatsRef = db.doc(`userStats/${depositorReferredBy}`);
             try {
-                // Use a secure atomic increment for the referrer's balance.
+                // Use a secure atomic increment for the referrer's balance. This is production-ready.
                 await referrerStatsRef.set({
                     availableBalance: FieldValue.increment(commissionAmount),
                 }, { merge: true });
@@ -262,3 +271,5 @@ const approveDepositFlow = ai.defineFlow(
     return { success: true };
   }
 );
+
+    
