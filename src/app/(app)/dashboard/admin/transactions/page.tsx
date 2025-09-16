@@ -34,6 +34,7 @@ import {
   runTransaction,
   getDoc,
   FieldValue,
+  updateDoc,
 } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from "@/lib/utils";
@@ -57,6 +58,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TAX_FREE_DAY } from "@/lib/config";
+import { approveDeposit } from "@/ai/flows/admin-actions";
+
 
 interface UserDisplayInfo {
     displayName?: string;
@@ -90,8 +93,6 @@ interface WithdrawalRequest {
   serviceFee?: number;
 }
 
-type TransactionItem = (TransactionProof | WithdrawalRequest) & { type: 'deposit' | 'withdrawal' };
-
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { isAdmin, loading: authLoading } = useAuth();
@@ -103,7 +104,7 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const [approvalItem, setApprovalItem] = useState<TransactionItem | null>(null);
+  const [approvalItem, setApprovalItem] = useState<TransactionProof | null>(null);
   const [approvalAmount, setApprovalAmount] = useState<number>(0);
 
   const fetchUserDetails = useCallback(async (userId: string) => {
@@ -128,76 +129,50 @@ export default function TransactionsPage() {
   }, [userCache]);
   
 
-  const handleUpdateStatus = useCallback(async (
-    type: 'deposit' | 'withdrawal',
+  const handleUpdateWithdrawalStatus = useCallback(async (
     id: string,
     userId: string,
-    verifiedAmount: number,
     status: 'approved' | 'rejected'
   ) => {
     setUpdatingId(id);
-    const collectionName = type === 'deposit' ? "transactionProofs" : "withdrawalRequests";
     const WITHDRAWAL_FEE_RATE = 0.15;
     const isTaxFreeDay = new Date().getDate() === TAX_FREE_DAY;
     
     try {
         await runTransaction(db, async (transaction) => {
-            const transactionDocRef = doc(db, collectionName, id);
+            const withdrawalDocRef = doc(db, "withdrawalRequests", id);
             const userStatsDocRef = doc(db, "userStats", userId);
 
-            // --- ALL READS MUST HAPPEN FIRST ---
-            const userStatsDoc = await transaction.get(userStatsDocRef);
-            // We don't need to read the transactionDoc itself as we are only writing to it.
+            const withdrawalDoc = await transaction.get(withdrawalDocRef);
+            if (!withdrawalDoc.exists()) throw new Error("Withdrawal request not found.");
             
-            // --- LOGIC & WRITES HAPPEN AFTER ALL READS ---
+            const userStatsDoc = await transaction.get(userStatsDocRef);
+            if (!userStatsDoc.exists()) throw new Error("User stats not found.");
+
             let updateData: any = { status };
+            const requestedAmount = withdrawalDoc.data().amount;
 
-            // Logic for approved transactions
             if (status === 'approved') {
-                if (type === 'deposit') {
-                    updateData.amount = verifiedAmount; // Update the deposit amount to the verified amount
-                    if (!userStatsDoc.exists()) {
-                        // Create the stats doc if it doesn't exist on first deposit
-                        transaction.set(userStatsDocRef, { 
-                            availableBalance: verifiedAmount,
-                            rechargeAmount: verifiedAmount,
-                            withdrawalAmount: 0,
-                            todaysEarnings: 0,
-                        });
-                    } else {
-                        transaction.update(userStatsDocRef, {
-                            availableBalance: FieldValue.increment(verifiedAmount),
-                            rechargeAmount: FieldValue.increment(verifiedAmount),
-                        });
-                    }
-                } else { // Withdrawal
-                    const serviceFee = isTaxFreeDay ? 0 : verifiedAmount * WITHDRAWAL_FEE_RATE;
-                    updateData.serviceFee = serviceFee;
-                    updateData.amount = verifiedAmount; // Update the withdrawal amount to the verified amount
+                const serviceFee = isTaxFreeDay ? 0 : requestedAmount * WITHDRAWAL_FEE_RATE;
+                updateData.serviceFee = serviceFee;
 
-                    const currentBalance = userStatsDoc.data()?.availableBalance || 0;
-                    if (currentBalance < verifiedAmount) {
-                        throw new Error("User has insufficient funds for this withdrawal.");
-                    }
-                    if (!userStatsDoc.exists()) {
-                         // This should not happen if a user can request a withdrawal, but as a safeguard:
-                        throw new Error("Cannot process withdrawal for a user with no stats record.");
-                    }
-
-                    transaction.update(userStatsDocRef, {
-                        availableBalance: FieldValue.increment(-verifiedAmount),
-                        withdrawalAmount: FieldValue.increment(verifiedAmount),
-                    });
+                const currentBalance = userStatsDoc.data()?.availableBalance || 0;
+                if (currentBalance < requestedAmount) {
+                    throw new Error("User has insufficient funds for this withdrawal.");
                 }
+
+                transaction.update(userStatsDocRef, {
+                    availableBalance: FieldValue.increment(-requestedAmount),
+                    withdrawalAmount: FieldValue.increment(requestedAmount),
+                });
             }
 
-            // Finally, update the transaction document itself (for both approved and rejected)
-            transaction.update(transactionDocRef, updateData);
+            transaction.update(withdrawalDocRef, updateData);
         });
 
         toast({
             title: "Status Updated",
-            description: `Transaction has been ${status}. ${isTaxFreeDay && type === 'withdrawal' && status === 'approved' ? 'No service fee was charged.' : ''}`,
+            description: `Withdrawal has been ${status}. ${isTaxFreeDay && status === 'approved' ? 'No service fee was charged.' : ''}`,
         });
 
     } catch (error: any) {
@@ -209,11 +184,29 @@ export default function TransactionsPage() {
         });
     } finally {
         setUpdatingId(null);
-        setApprovalItem(null);
-        setApprovalAmount(0);
     }
   }, [toast]);
 
+
+  const handleRejectDeposit = async (id: string) => {
+      setUpdatingId(id);
+      try {
+          const proofRef = doc(db, "transactionProofs", id);
+          await updateDoc(proofRef, { status: "rejected" });
+           toast({
+            title: "Status Updated",
+            description: `Deposit has been rejected.`,
+        });
+      } catch (error: any) {
+         toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: error.message || `Could not update the transaction status.`,
+        });
+      } finally {
+          setUpdatingId(null);
+      }
+  };
 
   useEffect(() => {
     if (!isAdmin) {
@@ -287,8 +280,6 @@ export default function TransactionsPage() {
   ) => {
      if (item.status !== 'pending') return null;
      
-     const transactionItem = { ...item, type };
-
      return (
         <div className="flex gap-2 justify-end">
             <AlertDialogTrigger asChild>
@@ -297,10 +288,12 @@ export default function TransactionsPage() {
                     variant="outline"
                     className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
                     onClick={() => {
-                        setApprovalItem(transactionItem);
-                        setApprovalAmount(item.amount);
+                        if (type === 'deposit') {
+                            setApprovalItem(item as TransactionProof);
+                            setApprovalAmount(item.amount);
+                        }
                     }}
-                    disabled={updatingId === item.id}
+                    disabled={updatingId === item.id || type === 'withdrawal'}
                 >
                     <CheckCircle className="h-4 w-4 mr-1" /> Approve
                 </Button>
@@ -309,7 +302,13 @@ export default function TransactionsPage() {
                 size="sm"
                 variant="outline"
                 className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={() => handleUpdateStatus(type, item.id, item.userId, 0, 'rejected')}
+                onClick={() => {
+                    if (type === 'deposit') {
+                        handleRejectDeposit(item.id);
+                    } else {
+                        handleUpdateWithdrawalStatus(item.id, item.userId, 'rejected');
+                    }
+                }}
                 disabled={updatingId === item.id}
             >
                 <XCircle className="h-4 w-4 mr-1" /> Reject
@@ -348,9 +347,29 @@ export default function TransactionsPage() {
     setApprovalAmount(0);
   };
 
-  const handleApprovalDialogConfirm = () => {
+  const handleApprovalDialogConfirm = async () => {
     if (!approvalItem) return;
-    handleUpdateStatus(approvalItem.type, approvalItem.id, approvalItem.userId, approvalAmount, 'approved');
+    setUpdatingId(approvalItem.id);
+    try {
+        await approveDeposit({
+            proofId: approvalItem.id,
+            verifiedAmount: approvalAmount,
+        });
+        toast({
+            title: "Status Updated",
+            description: `Deposit has been approved.`,
+        });
+    } catch (error: any) {
+         toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: error.message || `Could not approve the deposit.`,
+        });
+    } finally {
+        setUpdatingId(null);
+        setApprovalItem(null);
+        setApprovalAmount(0);
+    }
   };
 
   return (
@@ -376,7 +395,7 @@ export default function TransactionsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Deposit Proofs</CardTitle>
-                    <CardDescription>Verify payments in the corresponding system, then approve with the correct amount to credit the user's account.</CardDescription>
+                    <CardDescription>Verify payments, then approve with the correct amount to credit the user's account and award referral commission.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -477,7 +496,7 @@ export default function TransactionsPage() {
             </div>
             <AlertDialogFooter>
                 <AlertDialogCancel onClick={handleApprovalDialogCancel}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleApprovalDialogConfirm}>
+                <AlertDialogAction onClick={handleApprovalDialogConfirm} disabled={updatingId === approvalItem?.id}>
                     {updatingId ? <Loader2 className="animate-spin" /> : "Confirm & Approve"}
                 </AlertDialogAction>
             </AlertDialogFooter>
@@ -487,8 +506,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    
-
-    
-

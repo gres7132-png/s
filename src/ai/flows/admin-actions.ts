@@ -190,3 +190,78 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
     return { success: true };
   }
 );
+
+// --- Approve Deposit and Handle Referral ---
+export const ApproveDepositInputSchema = z.object({
+  proofId: z.string(),
+  verifiedAmount: z.number().positive(),
+});
+export type ApproveDepositInput = z.infer<typeof ApproveDepositInputSchema>;
+
+export async function approveDeposit(input: ApproveDepositInput): Promise<{success: boolean}> {
+    return approveDepositFlow(input);
+}
+
+const approveDepositFlow = ai.defineFlow(
+  {
+    name: 'approveDepositFlow',
+    inputSchema: ApproveDepositInputSchema,
+    outputSchema: z.object({ success: z.boolean() }),
+    auth: { user: true, admin: true },
+  },
+  async ({ proofId, verifiedAmount }, {auth}) => {
+    await verifyAdmin({auth}); // Pass auth object
+    const db = getFirestore();
+    const proofRef = db.doc(`transactionProofs/${proofId}`);
+    
+    const proofDoc = await proofRef.get();
+    if (!proofDoc.exists) throw new Error("Deposit proof not found.");
+
+    const depositorId = proofDoc.data()!.userId;
+    if (!depositorId) throw new Error("User ID not found on deposit proof.");
+    
+    // --- Step 1: Run transaction to approve deposit and credit user ---
+    await db.runTransaction(async (transaction) => {
+        const userStatsRef = db.doc(`userStats/${depositorId}`);
+        const userStatsDoc = await transaction.get(userStatsRef);
+        
+        // Approve the proof
+        transaction.update(proofRef, { status: 'approved', amount: verifiedAmount });
+        
+        // Credit the user's balance
+        if (userStatsDoc.exists()) {
+            transaction.update(userStatsRef, {
+                availableBalance: FieldValue.increment(verifiedAmount),
+                rechargeAmount: FieldValue.increment(verifiedAmount),
+            });
+        } else {
+            transaction.set(userStatsRef, {
+                availableBalance: verifiedAmount,
+                rechargeAmount: verifiedAmount,
+            });
+        }
+    });
+    
+    // --- Step 2: Handle referral commission outside the main transaction ---
+    const userDoc = await db.doc(`users/${depositorId}`).get();
+    const referrerId = userDoc.data()?.referredBy;
+    
+    if (referrerId) {
+        const commissionAmount = verifiedAmount * 0.05; // 5% commission
+        if (commissionAmount > 0) {
+            const referrerStatsRef = db.doc(`userStats/${referrerId}`);
+            try {
+                await referrerStatsRef.set({
+                    availableBalance: FieldValue.increment(commissionAmount),
+                }, { merge: true });
+                console.log(`Awarded KES ${commissionAmount} commission to referrer ${referrerId} for deposit ${proofId}.`);
+            } catch (error) {
+                console.error(`Failed to award commission to referrer ${referrerId}. Error: ${error}`);
+                // Don't throw error, main operation succeeded. Log for manual correction.
+            }
+        }
+    }
+
+    return { success: true };
+  }
+);

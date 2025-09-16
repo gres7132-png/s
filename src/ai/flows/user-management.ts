@@ -112,54 +112,6 @@ const updateUserStatusFlow = ai.defineFlow(
 
 
 /**
- * Processes a referral commission when a new investment is made.
- * This is now an internal function called by investPackageFlow.
- * @param {object} params The investor's UID and investment amount.
- * @returns {Promise<{success: boolean, commissionAwarded: number}>} A success flag and the commission amount.
- */
-async function processReferral({ investorId, investmentAmount }: { investorId: string, investmentAmount: number }): Promise<{success: boolean, commissionAwarded: number}> {
-    const db = getFirestore();
-    const investorDocRef = db.doc(`users/${investorId}`);
-    
-    const investorDoc = await investorDocRef.get();
-    if (!investorDoc.exists()) {
-      console.log(`Investor ${investorId} not found. No referral to process.`);
-      return { success: true, commissionAwarded: 0 };
-    }
-    
-    const referrerId = investorDoc.data()?.referredBy;
-    if (!referrerId) {
-      console.log(`Investor ${investorId} was not referred by anyone.`);
-      return { success: true, commissionAwarded: 0 };
-    }
-    
-    const commissionRate = 0.05; // 5%
-    const commissionAmount = investmentAmount * commissionRate;
-    
-    const referrerStatsRef = db.doc(`userStats/${referrerId}`);
-    
-    try {
-        const referrerStatsDoc = await referrerStatsRef.get();
-        if (referrerStatsDoc.exists()) {
-            await referrerStatsRef.update({
-                availableBalance: FieldValue.increment(commissionAmount)
-            });
-        } else {
-             await referrerStatsRef.set({
-                availableBalance: commissionAmount
-            }, { merge: true });
-        }
-      console.log(`Awarded ${commissionAmount} commission to referrer ${referrerId}.`);
-      return { success: true, commissionAwarded: commissionAmount };
-    } catch (error) {
-       console.error(`Failed to award commission to ${referrerId}:`, error);
-       // We don't re-throw here to ensure the main investment isn't rolled back if this fails.
-       return { success: false, commissionAwarded: 0 };
-    }
-}
-
-
-/**
  * Wrapper for requestWithdrawalFlow
  */
 export async function requestWithdrawal(input: WithdrawalRequestInput): Promise<{ success: boolean, requestId: string }> {
@@ -341,7 +293,6 @@ const investPackageFlow = ai.defineFlow(
     if (!pkgDoc.exists) {
         throw new Error('Investment package not found.');
     }
-    const pkg = pkgDoc.data()!;
 
 
     await db.runTransaction(async (transaction) => {
@@ -377,12 +328,6 @@ const investPackageFlow = ai.defineFlow(
       });
     });
 
-    // After the transaction succeeds, process the referral commission.
-    // This is done outside the transaction to avoid contention on the referrer's document.
-    await processReferral({ investorId: userId, investmentAmount: pkg.price });
-
     return { success: true };
   }
 );
-
-    
