@@ -35,7 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, DollarSign, Link as LinkIcon, Loader2, Landmark, AlertTriangle } from "lucide-react";
+import { Copy, DollarSign, Link as LinkIcon, Loader2, Landmark, AlertTriangle, Save } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { paymentDetails } from "@/lib/config";
 import Link from "next/link";
@@ -85,6 +85,7 @@ export default function WalletPage() {
   const [isSubmittingProof, setIsSubmittingProof] = useState(false);
   const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [savedPaymentDetails, setSavedPaymentDetails] = useState<BankingDetailsFormValues | null>(null);
   
   const withdrawalSchema = z.object({
@@ -132,14 +133,14 @@ export default function WalletPage() {
         setIsLoading(true);
         const userStatsDocRef = doc(db, "userStats", user.uid);
         const detailsDocRef = doc(db, "userPaymentDetails", user.uid);
+        const depositDraftDocRef = doc(db, "userDepositDrafts", user.uid);
+        const withdrawalDraftDocRef = doc(db, "userWithdrawalDrafts", user.uid);
 
         const unsubStats = onSnapshot(userStatsDocRef, (doc) => {
             if (doc.exists()) {
                 setWithdrawableBalance(doc.data().availableBalance || 0);
-            } else {
-                setWithdrawableBalance(0);
             }
-             setIsLoading(false);
+            setIsLoading(false);
         });
 
         const unsubDetails = onSnapshot(detailsDocRef, (doc) => {
@@ -151,14 +152,28 @@ export default function WalletPage() {
              setIsLoading(false);
         });
         
+        const unsubDepositDraft = onSnapshot(depositDraftDocRef, (doc) => {
+            if (doc.exists()) {
+                depositForm.reset(doc.data() as DepositFormValues);
+            }
+        });
+
+        const unsubWithdrawalDraft = onSnapshot(withdrawalDraftDocRef, (doc) => {
+            if (doc.exists()) {
+                withdrawalForm.reset(doc.data() as WithdrawalFormValues);
+            }
+        });
+        
         return () => {
             unsubStats();
             unsubDetails();
+            unsubDepositDraft();
+            unsubWithdrawalDraft();
         };
     } else {
         setIsLoading(false);
     }
-  }, [user, bankingDetailsForm]);
+  }, [user, bankingDetailsForm, depositForm, withdrawalForm]);
 
   const copyToClipboard = (text: string | undefined, label: string) => {
     if (!text) return;
@@ -169,19 +184,43 @@ export default function WalletPage() {
     });
   };
 
+  async function onSaveDraft<T extends DepositFormValues | WithdrawalFormValues>(
+    formType: 'deposit' | 'withdrawal', 
+    values: T
+  ) {
+    if (!user) { return toast({ variant: "destructive", title: "Not Authenticated" }); }
+    
+    setIsSavingDraft(true);
+    const collectionName = formType === 'deposit' ? 'userDepositDrafts' : 'userWithdrawalDrafts';
+    try {
+      const draftDocRef = doc(db, collectionName, user.uid);
+      await setDoc(draftDocRef, values, { merge: true });
+      toast({
+        title: "Draft Saved",
+        description: `Your ${formType} information has been saved.`,
+      });
+    } catch(e: any) {
+       toast({ variant: "destructive", title: "Draft Failed", description: e.message });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }
+
+
   async function onWithdrawalSubmit(values: WithdrawalFormValues) {
     if (!user) { return toast({ variant: "destructive", title: "Not Authenticated" }); }
     if (!savedPaymentDetails) { return toast({ variant: "destructive", title: "No Payment Details", description: "Please save your payment details before requesting a withdrawal."}); }
 
     setIsRequestingWithdrawal(true);
     try {
+        await onSaveDraft('withdrawal', values);
         await requestWithdrawal({ amount: values.amount, paymentDetails: savedPaymentDetails });
 
         toast({
           title: "Withdrawal Requested",
           description: `Your request to withdraw ${formatCurrency(values.amount)} is being processed.`,
         });
-        withdrawalForm.reset();
+        withdrawalForm.reset({amount: 0});
 
     } catch (error: any) {
         console.error("Error submitting withdrawal request:", error);
@@ -223,6 +262,7 @@ export default function WalletPage() {
     
     setIsSubmittingProof(true);
     try {
+        await onSaveDraft('deposit', values);
         await submitDepositProof({
             amount: values.amount,
             transactionProof: values.transactionProof,
@@ -232,7 +272,7 @@ export default function WalletPage() {
           title: "Proof Submitted",
           description: "Your deposit is being verified and will reflect in your account shortly.",
         });
-        depositForm.reset();
+        depositForm.reset({ amount: 0, transactionProof: "" });
     } catch (error: any) {
         console.error("Error submitting proof:", error);
         toast({
@@ -377,9 +417,20 @@ export default function WalletPage() {
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingProof}>
-                            {isSubmittingProof ? <Loader2 className="animate-spin" /> : "Submit Proof"}
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button 
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => onSaveDraft('deposit', depositForm.getValues())}
+                                disabled={isSavingDraft || isSubmittingProof}
+                            >
+                                {isSavingDraft ? <Loader2 className="animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Save Draft</>}
+                            </Button>
+                            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmittingProof || isSavingDraft}>
+                                {isSubmittingProof ? <Loader2 className="animate-spin" /> : "Submit Proof"}
+                            </Button>
+                        </div>
                     </form>
                 </Form>
             </CardContent>
@@ -408,7 +459,7 @@ export default function WalletPage() {
                         <FormControl>
                           <div className="relative">
                             <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input type="number" placeholder="0.00" className="pl-8" {...field} disabled={isRequestingWithdrawal}/>
+                            <Input type="number" placeholder="0.00" className="pl-8" {...field} disabled={isRequestingWithdrawal || isSavingDraft}/>
                           </div>
                         </FormControl>
                         <FormDescription>
@@ -418,9 +469,20 @@ export default function WalletPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isRequestingWithdrawal}>
-                     {isRequestingWithdrawal ? <Loader2 className="animate-spin" /> : "Request Withdrawal"}
-                  </Button>
+                   <div className="flex flex-col sm:flex-row gap-2">
+                      <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => onSaveDraft('withdrawal', withdrawalForm.getValues())}
+                          disabled={isSavingDraft || isRequestingWithdrawal}
+                      >
+                          {isSavingDraft ? <Loader2 className="animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Save Draft</>}
+                      </Button>
+                      <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isRequestingWithdrawal || isSavingDraft}>
+                        {isRequestingWithdrawal ? <Loader2 className="animate-spin" /> : "Request Withdrawal"}
+                      </Button>
+                   </div>
                 </form>
               </Form>
             </CardContent>
