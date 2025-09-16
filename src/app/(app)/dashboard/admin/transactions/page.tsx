@@ -385,8 +385,7 @@ export default function TransactionsPage() {
         });
     } finally {
         setUpdatingId(null);
-        setApprovalItem(null);
-        setApprovalAmount(0);
+        handleApprovalDialogCancel();
     }
   };
 
@@ -399,7 +398,7 @@ export default function TransactionsPage() {
         </p>
       </div>
 
-    <AlertDialog>
+    <AlertDialog open={!!approvalItem} onOpenChange={(open) => !open && handleApprovalDialogCancel()}>
        <Tabs defaultValue="deposits">
         <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="deposits">
@@ -524,5 +523,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    
