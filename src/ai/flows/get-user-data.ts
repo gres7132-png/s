@@ -11,6 +11,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getApps } from 'firebase-admin/app';
+import '@/ai/flows/user-management'; // Ensures Admin SDK is initialized
 
 // --- Referral Data Flow ---
 
@@ -33,7 +34,7 @@ export type ReferralData = z.infer<typeof ReferralDataSchema>;
  * It calculates total invested capital and commissions for each referred user.
  */
 export async function getReferralData(): Promise<ReferralData> {
-    return getReferralDataFlow({});
+    return getReferralDataFlow();
 }
 
 const getReferralDataFlow = ai.defineFlow(
@@ -92,3 +93,55 @@ const getReferralDataFlow = ai.defineFlow(
     };
   }
 );
+
+// --- Contributor Page Data ---
+
+const ContributorDataSchema = z.object({
+    activeReferralsCount: z.number(),
+    userBalance: z.number(),
+});
+export type ContributorData = z.infer<typeof ContributorDataSchema>;
+
+/**
+ * A secure flow to get prerequisite data for the Contributor Page.
+ */
+export async function getContributorData(): Promise<ContributorData> {
+    return getContributorDataFlow();
+}
+
+const getContributorDataFlow = ai.defineFlow(
+  {
+    name: 'getContributorDataFlow',
+    outputSchema: ContributorDataSchema,
+    auth: { user: true }
+  },
+  async (input, { auth }) => {
+    if (!auth) {
+        throw new Error("Authentication is required.");
+    }
+    if (!getApps().length) {
+        throw new Error("Admin SDK is not configured.");
+    }
+
+    const db = getFirestore();
+    const userId = auth.uid;
+
+    // Get user's balance
+    const userStatsRef = db.doc(`userStats/${userId}`);
+    const userStatsDoc = await userStatsRef.get();
+    const userBalance = userStatsDoc.exists() ? userStatsDoc.data()?.availableBalance || 0 : 0;
+    
+    // Get count of active referrals
+    const referralsQuery = db.collection("users")
+        .where("referredBy", "==", userId)
+        .where("hasActiveInvestment", "==", true);
+    const referralsSnapshot = await referralsQuery.get();
+    const activeReferralsCount = referralsSnapshot.size;
+
+    return {
+        userBalance,
+        activeReferralsCount,
+    };
+  }
+);
+

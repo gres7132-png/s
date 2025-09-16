@@ -38,21 +38,22 @@ export default function ReferralsPage() {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
       
-      getReferralData()
-        .then(data => {
-            setReferralData(data);
-        })
-        .catch(err => {
-            console.error("Failed to get referral data:", err);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not load your referral information."
-            });
-        })
-        .finally(() => {
+      const fetchReferralData = async () => {
+        try {
+          const data = await getReferralData();
+          setReferralData(data);
+        } catch (err: any) {
+          console.error("Failed to get referral data:", err);
+          toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Could not load your referral information. " + err.message,
+          });
+        } finally {
             setLoading(false);
-        });
+        }
+      }
+      fetchReferralData();
     }
   }, [user, toast]);
 
@@ -119,7 +120,7 @@ export default function ReferralsPage() {
             </div>
             <div className="text-right">
                 <p className="text-sm text-muted-foreground">Total Commission Earned</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalCommission)}</p>
+                <p className="text-2xl font-bold">{loading ? <Loader2 className="animate-spin" /> : formatCurrency(totalCommission)}</p>
             </div>
           </div>
         </CardHeader>

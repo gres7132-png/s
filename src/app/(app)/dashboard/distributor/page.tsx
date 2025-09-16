@@ -36,8 +36,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, doc, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { applyForContributorTier } from "@/ai/flows/user-management";
+import { getContributorData, ContributorData } from "@/ai/flows/get-user-data";
 
 interface ContributorTier {
   id: string;
@@ -45,11 +46,6 @@ interface ContributorTier {
   monthlyIncome: number;
   purchasedProducts: number;
   deposit: number;
-}
-
-interface ContributorData {
-    activeReferralsCount: number;
-    userBalance: number;
 }
 
 export default function DistributorPage() {
@@ -82,41 +78,23 @@ export default function DistributorPage() {
   useEffect(() => {
     if (user) {
         setLoadingData(true);
-        const userStatsRef = doc(db, "userStats", user.uid);
-        
-        const unsubStats = onSnapshot(userStatsRef, (doc) => {
-            setContributorData(prev => ({
-                ...prev,
-                userBalance: doc.exists() ? doc.data().availableBalance || 0 : 0,
-                activeReferralsCount: prev?.activeReferralsCount || 0,
-            }));
-        });
-
-        // Efficiently query for users who were referred by the current user and have active investments.
-        const referralsQuery = query(
-            collection(db, "users"),
-            where("referredBy", "==", user.uid),
-            where("hasActiveInvestment", "==", true)
-        );
-      
-        const unsubReferrals = onSnapshot(referralsQuery, (snapshot) => {
-            setContributorData(prev => ({
-                 ...prev,
-                userBalance: prev?.userBalance || 0,
-                activeReferralsCount: snapshot.size,
-            }));
-            setLoadingData(false);
-        }, (error) => {
-            console.error("Error fetching active referrals:", error);
-            setLoadingData(false);
-        });
-        
-        return () => {
-            unsubStats();
-            unsubReferrals();
-        };
+        getContributorData()
+            .then(data => {
+                setContributorData(data);
+            })
+            .catch(err => {
+                console.error("Failed to get contributor data:", err);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Could not load your contributor information."
+                });
+            })
+            .finally(() => {
+                setLoadingData(false);
+            });
     }
-  }, [user]);
+  }, [user, toast]);
   
   const handleApplyClick = (tier: ContributorTier) => {
     if (!contributorData || contributorData.userBalance < tier.deposit) {
