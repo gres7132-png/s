@@ -17,7 +17,10 @@ import { sendAdminNotification } from '@/ai/utils/email';
 // Centralized Firebase Admin SDK Initialization
 if (!getApps().length) {
   if (!process.env.FIREBASE_ADMIN_SDK_CONFIG) {
-    console.error("CRITICAL: FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.");
+    console.error("CRITICAL: FIREBASE_ADMIN_SDK_CONFIG environment variable is not set. The server cannot start without it.");
+    // In a real production environment, this would ideally stop the server process.
+    // In many serverless environments, this will cause initialization to fail and prevent the function/server from running.
+    throw new Error("Firebase Admin SDK configuration is missing.");
   } else {
     try {
       initializeApp({
@@ -26,6 +29,7 @@ if (!getApps().length) {
       console.log("Firebase Admin SDK initialized successfully.");
     } catch (e: any) {
       console.error("CRITICAL: Admin SDK initialization failed:", e.message);
+      throw new Error(`Firebase Admin SDK could not be initialized: ${e.message}`);
     }
   }
 }
@@ -322,5 +326,7 @@ const investPackageFlow = ai.defineFlow(
     return { success: true };
   }
 );
+
+    
 
     
