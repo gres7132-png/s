@@ -36,9 +36,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, doc } from "firebase/firestore";
 import { applyForContributorTier } from "@/ai/flows/user-management";
-import { getContributorData, ContributorData } from "@/ai/flows/get-user-data";
 
 interface ContributorTier {
   id: string;
@@ -46,6 +45,11 @@ interface ContributorTier {
   monthlyIncome: number;
   purchasedProducts: number;
   deposit: number;
+}
+
+interface ContributorData {
+    activeReferralsCount: number;
+    userBalance: number;
 }
 
 export default function DistributorPage() {
@@ -60,7 +64,7 @@ export default function DistributorPage() {
 
   useEffect(() => {
     const q = query(collection(db, "contributorTiers"), orderBy("deposit"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeTiers = onSnapshot(q, (querySnapshot) => {
         const fetchedTiers: ContributorTier[] = [];
         querySnapshot.forEach((doc) => {
             fetchedTiers.push({ id: doc.id, ...doc.data() } as ContributorTier);
@@ -72,24 +76,45 @@ export default function DistributorPage() {
         setLoadingTiers(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeTiers();
   }, []);
 
   useEffect(() => {
     if (user) {
         setLoadingData(true);
-        getContributorData()
-            .then(data => {
-                setContributorData(data);
-            })
-            .catch(err => {
-                console.error("Failed to get contributor data:", err);
-                // Fail silently as requested. The UI will just show buttons as disabled.
-                setContributorData(null);
-            })
-            .finally(() => {
-                setLoadingData(false);
-            });
+
+        // Listener for active referrals
+        const referralsQuery = query(
+            collection(db, "users"),
+            where("referredBy", "==", user.uid),
+            where("hasActiveInvestment", "==", true)
+        );
+        const unsubscribeReferrals = onSnapshot(referralsQuery, (snapshot) => {
+            setContributorData(prev => ({ ...prev, activeReferralsCount: snapshot.size } as ContributorData));
+        }, (error) => {
+            console.error("Error fetching active referrals:", error);
+            setContributorData(prev => ({ ...prev, activeReferralsCount: 0 } as ContributorData));
+        });
+
+        // Listener for user balance
+        const userStatsRef = doc(db, "userStats", user.uid);
+        const unsubscribeStats = onSnapshot(userStatsRef, (doc) => {
+             if (doc.exists()) {
+                setContributorData(prev => ({ ...prev, userBalance: doc.data().availableBalance || 0 } as ContributorData));
+            } else {
+                 setContributorData(prev => ({ ...prev, userBalance: 0 } as ContributorData));
+            }
+        }, (error) => {
+            console.error("Error fetching user balance:", error);
+            setContributorData(prev => ({ ...prev, userBalance: 0 } as ContributorData));
+        });
+        
+        setLoadingData(false);
+
+        return () => {
+            unsubscribeReferrals();
+            unsubscribeStats();
+        };
     }
   }, [user]);
   

@@ -25,32 +25,59 @@ import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { getReferralData, ReferralData } from "@/ai/flows/get-user-data";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query, where, getDocs, collectionGroup } from "firebase/firestore";
+
+interface ReferredUser {
+  id: string;
+  displayName: string;
+  capital: number;
+  status: 'Active' | 'Pending';
+}
 
 export default function ReferralsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState("");
-  const [referralData, setReferralData] = useState<ReferralData | null>(null);
+  const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       setReferralLink(`${window.location.origin}/auth?ref=${user.uid}`);
       
-      const fetchReferralData = async () => {
-        try {
-          const data = await getReferralData();
-          setReferralData(data);
-        } catch (err: any) {
-          console.error("Failed to get referral data:", err);
-          // Gracefully fail by setting empty data, do not show error toast.
-          setReferralData({ referredUsers: [], totalCommissionEarned: 0 });
-        } finally {
-            setLoading(false);
-        }
-      }
-      fetchReferralData();
+      const referralsQuery = query(collection(db, "users"), where("referredBy", "==", user.uid));
+      
+      const unsubscribe = onSnapshot(referralsQuery, async (snapshot) => {
+        setLoading(true);
+        const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        const usersWithCapital = await Promise.all(users.map(async (refUser) => {
+            const investmentsColRef = collection(db, `users/${refUser.id}/investments`);
+            const investmentsSnapshot = await getDocs(investmentsColRef);
+            
+            let totalInvested = 0;
+            investmentsSnapshot.forEach(investmentDoc => {
+                totalInvested += investmentDoc.data().price || 0;
+            });
+            
+            return {
+                id: refUser.id,
+                displayName: refUser.displayName || 'Unknown User',
+                capital: totalInvested,
+                status: totalInvested > 0 ? 'Active' : 'Pending' as 'Active' | 'Pending',
+            };
+        }));
+        
+        setReferredUsers(usersWithCapital);
+        setLoading(false);
+      }, (error) => {
+        console.error("Failed to get referral data in real-time:", error);
+        setReferredUsers([]); // Fail gracefully
+        setLoading(false);
+      });
+      
+      return () => unsubscribe();
     }
   }, [user]);
 
@@ -63,9 +90,6 @@ export default function ReferralsPage() {
     });
   };
   
-  const referredUsers = referralData?.referredUsers || [];
-  const totalCommission = referralData?.totalCommissionEarned || 0;
-
   return (
     <div className="space-y-8">
       <div>
@@ -114,10 +138,6 @@ export default function ReferralsPage() {
               <CardDescription>
                 Track the status and total invested capital of users you've personally referred.
               </CardDescription>
-            </div>
-             <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Commission (Deprecated)</p>
-                <p className="text-2xl font-bold text-muted-foreground line-through">{loading ? <Loader2 className="animate-spin" /> : formatCurrency(totalCommission)}</p>
             </div>
           </div>
         </CardHeader>
