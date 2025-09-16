@@ -1,5 +1,4 @@
 
-
 'use server';
 
 /**
@@ -289,40 +288,32 @@ const investPackageFlow = ai.defineFlow(
     const userId = auth.uid;
     const db = getFirestore();
 
-    const pkgDoc = await db.doc(`silverLevelPackages/${packageId}`).get();
-    if (!pkgDoc.exists) {
-        throw new Error('Investment package not found.');
-    }
-
-
     await db.runTransaction(async (transaction) => {
       const pkgRef = db.doc(`silverLevelPackages/${packageId}`);
       const userStatsRef = db.doc(`userStats/${userId}`);
       const userRef = db.doc(`users/${userId}`);
 
       // All reads must happen first in a transaction
-      // Re-fetch pkgDoc inside transaction
-      const pkgDocInTransaction = await transaction.get(pkgRef);
+      const pkgDoc = await transaction.get(pkgRef);
       const userStatsDoc = await transaction.get(userStatsRef);
       
-      if (!pkgDocInTransaction.exists) {
+      if (!pkgDoc.exists) {
         throw new Error('Investment package not found.');
       }
-      const pkgInTransaction = pkgDocInTransaction.data()!;
-
+      const pkgData = pkgDoc.data()!;
 
       const currentBalance = userStatsDoc.exists() ? userStatsDoc.data()?.availableBalance || 0 : 0;
-      if (currentBalance < pkgInTransaction.price) {
+      if (currentBalance < pkgData.price) {
         throw new Error('Insufficient funds to purchase this package.');
       }
 
       // All writes happen after reads
-      transaction.update(userStatsRef, { availableBalance: FieldValue.increment(-pkgInTransaction.price) });
+      transaction.update(userStatsRef, { availableBalance: FieldValue.increment(-pkgData.price) });
       transaction.set(userRef, { hasActiveInvestment: true }, { merge: true });
 
       const newInvestmentRef = db.collection(`users/${userId}/investments`).doc();
       transaction.set(newInvestmentRef, {
-        ...pkgInTransaction,
+        ...pkgData,
         startDate: Timestamp.now(),
         status: 'active',
       });
@@ -331,3 +322,5 @@ const investPackageFlow = ai.defineFlow(
     return { success: true };
   }
 );
+
+    

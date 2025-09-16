@@ -162,24 +162,15 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
       // READ must come first in a transaction
       const appData = applicationDoc.data();
       const userId = appData?.userId;
-      const depositAmount = appData?.depositAmount;
       
-      if (input.status === 'rejected' && userId && depositAmount > 0) {
-        // If rejected, refund the deposit.
-        const userStatsRef = db.doc(`userStats/${userId}`);
-        const userStatsDoc = await transaction.get(userStatsRef); // READ the user's stats
-        
-        if (userStatsDoc.exists()) {
-           // WRITE after the read
-           transaction.update(userStatsRef, {
-              availableBalance: FieldValue.increment(depositAmount),
-           });
-        } else {
-           // This case is unlikely but handled for safety.
-           // WRITE after the read
-           transaction.set(userStatsRef, {
-              availableBalance: depositAmount,
-           }, { merge: true });
+      if (input.status === 'rejected' && userId) {
+        const depositAmount = appData?.depositAmount;
+        if (depositAmount && depositAmount > 0) {
+            const userStatsRef = db.doc(`userStats/${userId}`);
+            // If rejected, refund the deposit.
+            transaction.update(userStatsRef, {
+                availableBalance: FieldValue.increment(depositAmount),
+            });
         }
       }
       
@@ -214,35 +205,31 @@ const approveDepositFlow = ai.defineFlow(
     const db = getFirestore();
     const proofRef = db.doc(`transactionProofs/${proofId}`);
     
-    const proofDoc = await proofRef.get();
-    if (!proofDoc.exists) throw new Error("Deposit proof not found.");
-
-    const depositorId = proofDoc.data()!.userId;
-    if (!depositorId) throw new Error("User ID not found on deposit proof.");
-    
     // --- Step 1: Run transaction to approve deposit and credit user ---
     await db.runTransaction(async (transaction) => {
+        const proofDoc = await transaction.get(proofRef);
+        if (!proofDoc.exists) throw new Error("Deposit proof not found.");
+
+        const depositorId = proofDoc.data()!.userId;
+        if (!depositorId) throw new Error("User ID not found on deposit proof.");
+        
         const userStatsRef = db.doc(`userStats/${depositorId}`);
-        const userStatsDoc = await transaction.get(userStatsRef);
         
         // Approve the proof
         transaction.update(proofRef, { status: 'approved', amount: verifiedAmount });
         
         // Credit the user's balance
-        if (userStatsDoc.exists()) {
-            transaction.update(userStatsRef, {
-                availableBalance: FieldValue.increment(verifiedAmount),
-                rechargeAmount: FieldValue.increment(verifiedAmount),
-            });
-        } else {
-            transaction.set(userStatsRef, {
-                availableBalance: verifiedAmount,
-                rechargeAmount: verifiedAmount,
-            });
-        }
+        transaction.set(userStatsRef, {
+            availableBalance: FieldValue.increment(verifiedAmount),
+            rechargeAmount: FieldValue.increment(verifiedAmount),
+        }, { merge: true });
     });
     
     // --- Step 2: Handle referral commission outside the main transaction ---
+    // Re-fetch the proof doc outside the transaction to get the depositorId
+    const finalProofDoc = await proofRef.get();
+    const depositorId = finalProofDoc.data()!.userId;
+
     const userDoc = await db.doc(`users/${depositorId}`).get();
     const referrerId = userDoc.data()?.referredBy;
     
@@ -265,3 +252,5 @@ const approveDepositFlow = ai.defineFlow(
     return { success: true };
   }
 );
+
+    

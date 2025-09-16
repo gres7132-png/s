@@ -280,24 +280,42 @@ export default function TransactionsPage() {
   ) => {
      if (item.status !== 'pending') return null;
      
+     const handleApproveClick = () => {
+        if (type === 'deposit') {
+            setApprovalItem(item as TransactionProof);
+            setApprovalAmount((item as TransactionProof).amount);
+        } else {
+            handleUpdateWithdrawalStatus(item.id, item.userId, 'approved');
+        }
+    };
+
+
      return (
         <div className="flex gap-2 justify-end">
-            <AlertDialogTrigger asChild>
+            {type === 'deposit' ? (
+                <AlertDialogTrigger asChild>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
+                        onClick={handleApproveClick}
+                        disabled={updatingId === item.id}
+                    >
+                        <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                    </Button>
+                </AlertDialogTrigger>
+            ) : (
                  <Button
                     size="sm"
                     variant="outline"
                     className="text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
-                    onClick={() => {
-                        if (type === 'deposit') {
-                            setApprovalItem(item as TransactionProof);
-                            setApprovalAmount(item.amount);
-                        }
-                    }}
-                    disabled={updatingId === item.id || type === 'withdrawal'}
+                    onClick={handleApproveClick}
+                    disabled={updatingId === item.id}
                 >
                     <CheckCircle className="h-4 w-4 mr-1" /> Approve
                 </Button>
-            </AlertDialogTrigger>
+            )}
+
             <Button
                 size="sm"
                 variant="outline"
@@ -506,3 +524,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+    
