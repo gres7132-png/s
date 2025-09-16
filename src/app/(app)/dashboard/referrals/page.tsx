@@ -44,8 +44,7 @@ export default function ReferralsPage() {
           setReferralData(data);
         } catch (err: any) {
           console.error("Failed to get referral data:", err);
-          // Gracefully fail by setting empty data.
-          // The backend already handles commission payouts separately.
+          // Gracefully fail by setting empty data, do not show error toast.
           setReferralData({ referredUsers: [], totalCommissionEarned: 0 });
         } finally {
             setLoading(false);
@@ -53,7 +52,7 @@ export default function ReferralsPage() {
       }
       fetchReferralData();
     }
-  }, [user, toast]);
+  }, [user]);
 
   const copyToClipboard = () => {
     if (!referralLink) return;
@@ -102,7 +101,7 @@ export default function ReferralsPage() {
           <AlertTitle>Commission Structure</AlertTitle>
           <AlertDescription>
             <p className="mt-2">
-                You earn a <strong>5%</strong> commission on the total amount invested by users you directly refer. The commission is automatically added to your available balance each time they make an investment.
+                You earn a <strong>5%</strong> commission on the total amount deposited by users you directly refer. The commission is automatically added to your available balance each time their deposit is approved by an administrator.
             </p>
           </AlertDescription>
         </Alert>
@@ -113,12 +112,12 @@ export default function ReferralsPage() {
             <div>
               <CardTitle>Your Direct Referrals</CardTitle>
               <CardDescription>
-                Track the status of users you've personally referred and the commission you've earned.
+                Track the status and total invested capital of users you've personally referred.
               </CardDescription>
             </div>
-            <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Commission Earned</p>
-                <p className="text-2xl font-bold">{loading ? <Loader2 className="animate-spin" /> : formatCurrency(totalCommission)}</p>
+             <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total Commission (Deprecated)</p>
+                <p className="text-2xl font-bold text-muted-foreground line-through">{loading ? <Loader2 className="animate-spin" /> : formatCurrency(totalCommission)}</p>
             </div>
           </div>
         </CardHeader>
@@ -128,14 +127,13 @@ export default function ReferralsPage() {
               <TableRow>
                 <TableHead>User Name</TableHead>
                 <TableHead>Total Invested Capital</TableHead>
-                <TableHead>Your Total Commission (5%)</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={3} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
                   </TableCell>
                 </TableRow>
@@ -144,7 +142,6 @@ export default function ReferralsPage() {
                   <TableRow key={refUser.id}>
                     <TableCell className="font-medium">{refUser.displayName}</TableCell>
                     <TableCell>{formatCurrency(refUser.capital)}</TableCell>
-                    <TableCell>{formatCurrency(refUser.commissionEarned)}</TableCell>
                     <TableCell>
                       <Badge variant={refUser.status === 'Active' ? 'default' : 'secondary'}>
                         {refUser.status}
@@ -154,7 +151,7 @@ export default function ReferralsPage() {
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                         You have not referred any users yet.
                     </TableCell>
                 </TableRow>

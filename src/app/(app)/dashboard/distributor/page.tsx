@@ -84,17 +84,14 @@ export default function DistributorPage() {
             })
             .catch(err => {
                 console.error("Failed to get contributor data:", err);
-                toast({
-                    variant: "destructive",
-                    title: "Error",
-                    description: "Could not load your contributor information."
-                });
+                // Fail silently as requested. The UI will just show buttons as disabled.
+                setContributorData(null);
             })
             .finally(() => {
                 setLoadingData(false);
             });
     }
-  }, [user, toast]);
+  }, [user]);
   
   const handleApplyClick = (tier: ContributorTier) => {
     if (!contributorData || contributorData.userBalance < tier.deposit) {
@@ -141,7 +138,7 @@ export default function DistributorPage() {
     setSelectedTier(null);
   };
 
-  const prerequisiteMet = (contributorData?.activeReferralsCount ?? 0) >= 2;
+  const prerequisiteMet = contributorData ? contributorData.activeReferralsCount >= 2 : false;
 
   return (
     <>
@@ -168,7 +165,7 @@ export default function DistributorPage() {
               <Users className="h-4 w-4" />
               <AlertTitle>Prerequisite Not Met</AlertTitle>
               <AlertDescription>
-                  You must refer at least two users who have made an investment before you can apply to become a contributor. You currently have {contributorData?.activeReferralsCount} active referral(s).
+                  You must refer at least two users who have made an investment before you can apply to become a contributor. You currently have {contributorData?.activeReferralsCount ?? 0} active referral(s).
               </AlertDescription>
           </Alert>
         )}

@@ -75,7 +75,9 @@ const getReferralDataFlow = ai.defineFlow(
             totalInvested += investmentDoc.data().price || 0;
         });
 
-        const commission = totalInvested * 0.05; // 5% commission
+        // This commission is for display purposes on the referral page.
+        // The actual commission is now handled by the approveDeposit flow.
+        const commission = 0; // Set to 0 as commission is now deposit-based.
         totalCommissionEarned += commission;
 
         return {
@@ -144,4 +146,3 @@ const getContributorDataFlow = ai.defineFlow(
     };
   }
 );
-
