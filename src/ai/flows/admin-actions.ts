@@ -169,14 +169,19 @@ const updateContributorApplicationStatusFlow = ai.defineFlow(
       if (!appData) {
         throw new Error('Application data is missing.');
       }
+
+      if (appData.status !== 'pending') {
+          throw new Error('This application has already been processed.');
+      }
+
       const userId = appData.userId;
       
+      // If the application is rejected, atomically refund the deposit.
       if (input.status === 'rejected' && userId) {
         const depositAmount = appData.depositAmount;
         if (depositAmount && depositAmount > 0) {
             const userStatsRef = db.doc(`userStats/${userId}`);
-            // If rejected, refund the deposit using a secure atomic increment.
-            // This is production-ready and safe from race conditions.
+            // This is a secure atomic increment, safe from race conditions.
             transaction.set(userStatsRef, {
                 availableBalance: FieldValue.increment(depositAmount),
             }, { merge: true });

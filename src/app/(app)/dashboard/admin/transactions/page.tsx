@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle, XCircle, ShieldAlert, ArrowUpCircle, ArrowDownCircle, Info } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, ShieldAlert, ArrowUpCircle, ArrowDownCircle, Info, Gift } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import {
@@ -58,7 +58,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TAX_FREE_DAY } from "@/lib/config";
-import { approveDeposit } from "@/ai/flows/admin-actions";
+import { approveDeposit, updateContributorApplicationStatus } from "@/ai/flows/admin-actions";
 
 
 interface UserDisplayInfo {
@@ -72,6 +72,15 @@ interface TransactionProof {
   proof: string;
   amount: number;
   submittedAt: Timestamp;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+interface ContributorApplication {
+  id: string;
+  userId: string;
+  tierLevel: string;
+  depositAmount: number;
+  appliedAt: Timestamp;
   status: 'pending' | 'approved' | 'rejected';
 }
 
@@ -99,6 +108,7 @@ export default function TransactionsPage() {
   
   const [proofs, setProofs] = useState<TransactionProof[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [applications, setApplications] = useState<ContributorApplication[]>([]);
   const [userCache, setUserCache] = useState<Record<string, UserDisplayInfo>>({});
   
   const [loading, setLoading] = useState(true);
@@ -127,6 +137,25 @@ export default function TransactionsPage() {
     }
     return { displayName: 'Unknown User', email: '' };
   }, [userCache]);
+
+  const handleUpdateApplicationStatus = useCallback(async (id: string, status: 'approved' | 'rejected') => {
+    setUpdatingId(id);
+    try {
+      await updateContributorApplicationStatus({ applicationId: id, status });
+      toast({
+        title: "Application Updated",
+        description: `The application has been ${status}.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || `Could not update the application status.`,
+      });
+    } finally {
+      setUpdatingId(null);
+    }
+  }, [toast]);
   
 
   const handleUpdateWithdrawalStatus = useCallback(async (
@@ -248,9 +277,26 @@ export default function TransactionsPage() {
        setLoading(false);
     });
 
+    const applicationsQuery = query(collection(db, "contributorApplications"), orderBy("appliedAt", "desc"));
+    const unsubscribeApplications = onSnapshot(applicationsQuery, (snapshot) => {
+        const fetchedApplications: ContributorApplication[] = [];
+        snapshot.forEach(doc => {
+            const data = doc.data() as Omit<ContributorApplication, 'id'>;
+            fetchedApplications.push({ id: doc.id, ...data });
+            if (data.userId) fetchUserDetails(data.userId);
+        });
+        setApplications(fetchedApplications);
+        setLoading(false);
+    }, (error) => {
+      console.error("Error fetching applications:", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch applications." });
+      setLoading(false);
+    });
+
     return () => {
       unsubscribeDeposits();
       unsubscribeWithdrawals();
+      unsubscribeApplications();
     };
   }, [isAdmin, toast, fetchUserDetails]);
 
@@ -275,8 +321,8 @@ export default function TransactionsPage() {
   );
 
   const renderActionButtons = (
-      type: 'deposit' | 'withdrawal',
-      item: TransactionProof | WithdrawalRequest
+      type: 'deposit' | 'withdrawal' | 'application',
+      item: TransactionProof | WithdrawalRequest | ContributorApplication
   ) => {
      if (item.status !== 'pending') return null;
      
@@ -284,8 +330,10 @@ export default function TransactionsPage() {
         if (type === 'deposit') {
             setApprovalItem(item as TransactionProof);
             setApprovalAmount((item as TransactionProof).amount);
-        } else {
+        } else if (type === 'withdrawal') {
             handleUpdateWithdrawalStatus(item.id, item.userId, 'approved');
+        } else if (type === 'application') {
+            handleUpdateApplicationStatus(item.id, 'approved');
         }
     };
 
@@ -323,8 +371,10 @@ export default function TransactionsPage() {
                 onClick={() => {
                     if (type === 'deposit') {
                         handleRejectDeposit(item.id);
-                    } else {
+                    } else if (type === 'withdrawal') {
                         handleUpdateWithdrawalStatus(item.id, item.userId, 'rejected');
+                    } else if (type === 'application') {
+                        handleUpdateApplicationStatus(item.id, 'rejected');
                     }
                 }}
                 disabled={updatingId === item.id}
@@ -394,18 +444,21 @@ export default function TransactionsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Approve Transactions</h1>
         <p className="text-muted-foreground">
-          Review and approve or reject user deposits and withdrawals.
+          Review and approve or reject user deposits, withdrawals, and applications.
         </p>
       </div>
 
     <AlertDialog open={!!approvalItem} onOpenChange={(open) => !open && handleApprovalDialogCancel()}>
        <Tabs defaultValue="deposits">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="deposits">
                 <ArrowUpCircle className="mr-2 h-4 w-4" />Deposits
             </TabsTrigger>
             <TabsTrigger value="withdrawals">
                 <ArrowDownCircle className="mr-2 h-4 w-4" />Withdrawals
+            </TabsTrigger>
+            <TabsTrigger value="applications">
+                <Gift className="mr-2 h-4 w-4" />Applications
             </TabsTrigger>
         </TabsList>
         <TabsContent value="deposits">
@@ -482,6 +535,46 @@ export default function TransactionsPage() {
                                 ))
                             ) : (
                                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No withdrawal requests yet.</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="applications">
+             <Card>
+                <CardHeader>
+                    <CardTitle>Contributor Applications</CardTitle>
+                    <CardDescription>Approve applications for users to join a contributor tier. If rejected, their deposit will be automatically refunded.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>User</TableHead>
+                                <TableHead>Tier</TableHead>
+                                <TableHead>Deposit</TableHead>
+                                <TableHead>Applied</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                             {loading ? (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" /></TableCell></TableRow>
+                            ) : applications.length > 0 ? (
+                                applications.map((app) => (
+                                <TableRow key={app.id} className={updatingId === app.id ? 'opacity-50' : ''}>
+                                    <TableCell className="font-medium">{userCache[app.userId]?.displayName || 'Loading...'}</TableCell>
+                                    <TableCell><Badge variant="secondary">{app.tierLevel}</Badge></TableCell>
+                                    <TableCell className="font-medium">{formatCurrency(app.depositAmount)}</TableCell>
+                                    <TableCell className="text-muted-foreground">{app.appliedAt ? formatDistanceToNow(app.appliedAt.toDate(), { addSuffix: true }) : 'Just now'}</TableCell>
+                                    <TableCell>{renderStatusBadge(app.status)}</TableCell>
+                                    <TableCell className="text-right">{renderActionButtons('application', app)}</TableCell>
+                                </TableRow>
+                                ))
+                            ) : (
+                                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No contributor applications yet.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
