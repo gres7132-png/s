@@ -436,4 +436,3 @@ export default function UserDetailsPage({ params: { userId } }: { params: { user
       </Dialog>
       </>
   )
-}
