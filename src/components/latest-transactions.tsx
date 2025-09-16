@@ -10,31 +10,13 @@ import {
 } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Landmark, Smartphone } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 import { getLiveTransactionsData, LiveTransactionsData } from "@/ai/flows/get-live-transactions-data";
 
 
 // --- Automated Bot Transaction Data ---
-
-// A more structured and culturally aware approach to name generation.
-// We pair common Christian/English names with vernacular surnames from major communities.
-const christianNames = ["Abigael","Abraham","Adam","Adrian","Agnes","Albert","Alex","Alexander","Alice","Alicia","Alvin","Amina","Amos","Anderson","Andrew","Angela","Ann","Anna","Anne","Anthony","Arnold","Ashley","Asher","Austin","Barbra","Beatrice","Ben","Benjamin","Benson","Bernard","Bertha","Betty","Bonface","Brenda","Brian","Bridget","Brighton","Bruce","Calvin","Carl","Caroline","Catherine","Caleb","Cecilia","Charles","Charity","Charlotte","Chris","Christian","Christine","Christopher","Claire","Clara","Clare","Clement","Collins","Colman","Cynthia","Daisy","Damaris","Daniel","David","Davies","Debora","Denis","Dennis","Derick","Diana","Donald","Doreen","Doris","Dorothy","Douglas","Duncan","Dylan","Edgar","Edith","Edmond","Edna","Edu","Edward","Edwin","Elia","Elias","Elijah","Elikanah","Elizabeth","Elsa","Elsie","Elvis","Emmanuel","Erick","Eric","Ernest","Esther","Eunice","Eva","Evans","Everlyne","Faith","Fatuma","Felix","Ferdinand","Festus","Fidel","Florence","Francis","Frank","Fred","Frederick","Geoffrey","George","Getrude","Gideon","Gilbert","Gladwell","Gladys","Gloria","Godfrey","Grace","Habiba","Halima","Hellen","Henry","Hilda","Hillary","Hope","Hussein","Ian","Ibrahim","Immanuel","Irene","Isaac","Ismael","Israel","Ivan","Ivy","Jack","Jackline","Jackson","Jacob","James","Jane","Janet","Jason","Jeff","Jennifer","Jeremiah","Jeremy","Jerry","Jessica","Joan","Joash","Joel","John","Jona","Jonathan","Joseph","Josephine","Joshua","Joy","Joyce","Jude","Judith","Juliana","Juliet","Julius","Junior","Justin","Justus","Karen","Kate","Kelvin","Ken","Kennedy","Kenneth","Kevin","Laura","Lauren","Lawrence","Leah","Lilian","Linda","Lisa","Lorna","Louis","Lucas","Lucy","Lydia","Lynette","Magdalene","Margaret","Mark","Martha","Martin","Mary","Mathew","Maureen","Maurice","Maxwell","Melvin","Mercy","Michael","Michelle","Mike","Mildred","Milicent","Miriam","Mitchelle","Mohammed","Morris","Moses","Muriam","Nancy","Naomi","Nathan","Nelson","Nelly","Newton","Nicholas","Nickson","Noah","Noel","Norah","Norman","Oliver","Olivia","Oscar","Owen","Pamela","Pascal","Patricia","Patrick","Paul","Pauline","Peter","Philip","Phylis","Purity","Rachael","Rachel","Ralph","Randolph","Raphael","Raymond","Reagan","Rebecca","Regina","Reuben","Rhoda","Richard","Rita","Robert","Robbin","Rodgers","Ronald","Ronny","Rose","Rosemary","Roy","Ruth","Sabina","Said","Salim","Sam","Sammy","Samuel","Sandra","Sarah","Saumu","Sharon","Shaun","Sheila","Shirley","Sidney","Silas","Simon","Solomon","Sophia","Stacy","Stanley","Stella","Stephen","Steve","Steven","Susan","Sylus","Sylvia","Teresa","Thomas","Timothy","Titus","Tobias","Tom","Tony","Tracy","Valentine","Valerie","Venessa","Vero","Veronica","Victor","Victoria","Vincent","Viola","Violet","Virginia","Vivian","Walter","Wendy","Wilfred","Wilkister","William","Willy","Wilson","Winnie","Wycliff","Yvonne","Yvone","Zachariah","Zainab","Zipporah"];
-const surnamesByCommunity = {
-    kikuyu: ["Mbugua", "Njogu", "Kamau", "Njoroge", "Maina", "Mwangi", "Kariuki", "Gitau", "Ng'ang'a", "Wanjiru", "Wambui", "Njeri", "Wanjiku", "Waithera", "Nyambura", "Wairimu", "Muthoni", "Wangari", "Wangui"],
-    luhya: ["Wamalwa", "Wafula", "Simiyu", "Nekesa", "Wanyonyi", "Khisa", "Juma", "Nasimiyu", "Wangila", "Masinde", "Barasa", "Situma", "Wekesa", "Nafula"],
-    kalenjin: ["Kiprotich", "Chebet", "Kipkoech", "Cherono", "Kipkirui", "Chepkoech", "Kipkemboi", "Jepkemboi", "Kipruto", "Jepchirchir", "Kibet", "Cheptoo", "Koech", "Jepkosgei", "Kiptoo", "Jebet"],
-    luo: ["Ochieng'", "Achieng'", "Otieno", "Atieno", "Onyango", "Anyango", "Okoth", "Akoth", "Ouma", "Auma", "Owino", "Awino", "Omondi", "Amondi", "Okinyi", "Akinyi"],
-    kamba: ["Mutua", "Musyoka", "Nthenya", "Muthama", "Mutuku", "Mwikali", "Kyalo", "Mwende", "Mutisya", "Nduku", "Kioko", "Wayua", "Wambua", "Syombua"],
-    kisii: ["Ondieki", "Nyaboke", "Mogaka", "Kwamboka", "Nyamweya", "Kerubo", "Osoro", "Moraa", "Ombasa", "Bwari", "Gichana", "Kemunto"],
-    meru: ["Murithi", "Muthomi", "Kendi", "Kinoti", "Nkatha", "Kimathi", "Makena", "Muriuki", "Karimi", "Mugambi", "Kinya"],
-    maasai: ["Ole Tipis", "Naserian", "Ole Metu", "Naisiae", "Ole Ntimama", "Naneu", "Lekakeny", "Simantoi"],
-    mijikenda: ["Mdigo", "Wanje", "Chai", "Mbeyu", "Tsuma", "Kwekwe", "Kenga", "Dama"],
-    somali: ["Hassan", "Ali", "Abdi", "Fatuma", "Ibrahim", "Amina", "Mohamed", "Halima", "Hussein", "Asha"]
-};
-
-
 const transactionTypes: ('Deposit' | 'Withdrawal')[] = ['Deposit', 'Withdrawal'];
 const paymentMethods = ["M-PESA", "M-PESA", "M-PESA", "M-PESA", "Bank Transfer", "M-PESA", "M-PESA", "M-PESA"];
 
@@ -46,6 +28,7 @@ interface BotTransaction {
     timestamp: Date;
     modeOfPayment: string;
     transactionCode: string;
+    isBot: boolean;
 }
 
 const generateRandomString = (length: number) => {
@@ -62,35 +45,21 @@ const generateRandomTransaction = (
     realUsers: { displayName: string }[] = [],
     packagePrices: number[] = []
 ): BotTransaction => {
-    let userName = '';
-
-    // Decide whether to use a real user or generate a bot name (e.g., 20% chance to use a real user)
-    if (realUsers.length > 0 && Math.random() < 0.2) {
+    let userName = 'Anonymous';
+    if (realUsers.length > 0) {
         const randomRealUser = realUsers[Math.floor(Math.random() * realUsers.length)];
         userName = randomRealUser.displayName;
-    } else {
-        // Fallback to generating a culturally-aware random name
-        const communityKeys = Object.keys(surnamesByCommunity);
-        const randomCommunityKey = communityKeys[Math.floor(Math.random() * communityKeys.length)];
-        const surnames = surnamesByCommunity[randomCommunityKey as keyof typeof surnamesByCommunity];
-        const firstName = christianNames[Math.floor(Math.random() * christianNames.length)];
-        const lastName = surnames[Math.floor(Math.random() * surnames.length)];
-        userName = `${firstName} ${lastName}`;
     }
 
     const type = transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
     const modeOfPayment = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
     
     let amount;
-    // For deposits, make them rhyme with package prices
     if (type === 'Deposit' && packagePrices.length > 0 && Math.random() < 0.8) {
-        // 80% chance to pick a package price
         amount = packagePrices[Math.floor(Math.random() * packagePrices.length)];
     } else if (type === 'Deposit') {
-        // Fallback for deposits (smaller, random top-ups)
         amount = Math.random() * (5000 - 500) + 500;
     } else {
-        // Withdrawals remain random
         amount = Math.random() * (50000 - 1000) + 1000;
     }
 
@@ -98,8 +67,7 @@ const generateRandomTransaction = (
     const fullCode = 'TI' + randomCodePart;
     const transactionCode = `${fullCode.substring(0, 3)}...${fullCode.substring(7)}`;
     
-    // Create a timestamp that is slightly in the past to appear more random
-    const timestamp = new Date(new Date().getTime() - Math.random() * 1000 * 60 * 3); // Within the last 3 minutes
+    const timestamp = new Date(new Date().getTime() - Math.random() * 1000 * 60 * 3);
 
     return {
         id: new Date().getTime().toString() + Math.random(),
@@ -109,6 +77,7 @@ const generateRandomTransaction = (
         timestamp: timestamp,
         modeOfPayment: modeOfPayment,
         transactionCode: transactionCode,
+        isBot: true,
     };
 };
 
@@ -119,14 +88,33 @@ export default function LatestTransactions() {
   const [liveData, setLiveData] = useState<LiveTransactionsData | null>(null);
 
   useEffect(() => {
-    // Fetch real user and package data securely via Genkit flow
     async function fetchData() {
         try {
             const data = await getLiveTransactionsData();
             setLiveData(data);
+
+            const realTransactions = data.recentTransactions.map(tx => ({
+                id: tx.timestamp + tx.userName + tx.amount,
+                type: tx.type,
+                userName: tx.userName,
+                amount: tx.amount,
+                timestamp: new Date(tx.timestamp),
+                modeOfPayment: 'M-PESA', // Defaulting for real tx
+                transactionCode: 'TX...REAL',
+                isBot: false,
+            }));
+
+            const initialBotTransactions = Array.from({ length: Math.max(0, 7 - realTransactions.length) }, () => 
+                generateRandomTransaction(data.users, data.packagePrices)
+            );
+
+            setTransactions([...realTransactions, ...initialBotTransactions].sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime()));
+
         } catch (error) {
             console.error("Failed to fetch live transaction data:", error);
-            // Don't block the UI, the bot can run with generated names
+            // Fallback to bot-only if the fetch fails
+            const initialBotTransactions = Array.from({ length: 7 }, () => generateRandomTransaction([], []));
+            setTransactions(initialBotTransactions.sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime()));
         } finally {
             setLoading(false);
         }
@@ -135,26 +123,21 @@ export default function LatestTransactions() {
   }, []);
 
   useEffect(() => {
-    if(loading) return; // Don't start the interval until initial data is loaded
+    if(loading || !liveData) return;
 
-    // Generate initial transactions
-    const initialTransactions = Array.from({ length: 5 }, () => 
-        generateRandomTransaction(liveData?.users, liveData?.packagePrices)
-    ).sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime());
-    setTransactions(initialTransactions);
-
-    // This interval creates the "live" feeling by adding new transactions
     const interval = setInterval(() => {
       const newTx = generateRandomTransaction(liveData?.users, liveData?.packagePrices);
-      setTransactions(prev => 
-        [newTx, ...prev].slice(0, 7).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-      );
-    }, 5000); // A new transaction appears every 5 seconds
+      setTransactions(prev => {
+          const newState = [newTx, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+          // Only keep real transactions and a few bot ones to keep the list from growing indefinitely
+          const realTxs = newState.filter(tx => !tx.isBot);
+          const botTxs = newState.filter(tx => tx.isBot);
+          return [...realTxs, ...botTxs.slice(0, 7 - realTxs.length)];
+      });
+    }, 5000);
 
-    return () => {
-        clearInterval(interval);
-    };
-  }, [loading, liveData]); // Rerun effect if data changes
+    return () => clearInterval(interval);
+  }, [loading, liveData]);
   
   const getPaymentIcon = (method: string) => {
     switch (method) {
@@ -163,6 +146,10 @@ export default function LatestTransactions() {
         default: return <Banknote className="h-4 w-4" />;
     }
   }
+
+  const sortedTransactions = useMemo(() => {
+    return transactions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 7);
+  }, [transactions]);
 
   return (
     <Card>
@@ -184,12 +171,12 @@ export default function LatestTransactions() {
                  <Skeleton className="h-5 w-1/4" />
              </div>
           ))}
-          {!loading && transactions.length === 0 && (
+          {!loading && sortedTransactions.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">
               No recent approved transactions.
             </p>
           )}
-          {!loading && transactions.map((tx) => (
+          {!loading && sortedTransactions.map((tx) => (
             <div key={tx.id} className="flex items-center gap-4">
               <div>
                 {tx.type === 'Deposit' ? (
