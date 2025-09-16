@@ -31,9 +31,7 @@ import {
   orderBy,
   doc,
   Timestamp,
-  runTransaction,
   getDoc,
-  FieldValue,
   updateDoc,
 } from "firebase/firestore";
 import { formatDistanceToNow } from 'date-fns';
@@ -57,8 +55,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TAX_FREE_DAY } from "@/lib/config";
-import { approveDeposit, updateContributorApplicationStatus } from "@/ai/flows/admin-actions";
+import { approveDeposit, updateContributorApplicationStatus, approveWithdrawal, rejectWithdrawal } from "@/ai/flows/admin-actions";
 
 
 interface UserDisplayInfo {
@@ -158,61 +155,25 @@ export default function TransactionsPage() {
   }, [toast]);
   
 
-  const handleUpdateWithdrawalStatus = useCallback(async (
-    id: string,
-    userId: string,
-    status: 'approved' | 'rejected'
-  ) => {
+  const handleUpdateWithdrawalStatus = useCallback(async (id: string, status: 'approved' | 'rejected') => {
     setUpdatingId(id);
-    const WITHDRAWAL_FEE_RATE = 0.15;
-    const isTaxFreeDay = new Date().getDate() === TAX_FREE_DAY;
-    
     try {
-        await runTransaction(db, async (transaction) => {
-            const withdrawalDocRef = doc(db, "withdrawalRequests", id);
-            const userStatsDocRef = doc(db, "userStats", userId);
-
-            const withdrawalDoc = await transaction.get(withdrawalDocRef);
-            if (!withdrawalDoc.exists()) throw new Error("Withdrawal request not found.");
-            
-            const userStatsDoc = await transaction.get(userStatsDocRef);
-            if (!userStatsDoc.exists()) throw new Error("User stats not found.");
-
-            let updateData: any = { status };
-            const requestedAmount = withdrawalDoc.data().amount;
-
-            if (status === 'approved') {
-                const serviceFee = isTaxFreeDay ? 0 : requestedAmount * WITHDRAWAL_FEE_RATE;
-                updateData.serviceFee = serviceFee;
-
-                const currentBalance = userStatsDoc.data()?.availableBalance || 0;
-                if (currentBalance < requestedAmount) {
-                    throw new Error("User has insufficient funds for this withdrawal.");
-                }
-
-                transaction.update(userStatsDocRef, {
-                    availableBalance: FieldValue.increment(-requestedAmount),
-                    withdrawalAmount: FieldValue.increment(requestedAmount),
-                });
-            }
-
-            transaction.update(withdrawalDocRef, updateData);
-        });
-
-        toast({
-            title: "Status Updated",
-            description: `Withdrawal has been ${status}. ${isTaxFreeDay && status === 'approved' ? 'No service fee was charged.' : ''}`,
-        });
-
+      if (status === 'approved') {
+        const { message } = await approveWithdrawal({ withdrawalId: id });
+        toast({ title: "Status Updated", description: message });
+      } else {
+        await rejectWithdrawal({ withdrawalId: id });
+        toast({ title: "Status Updated", description: "Withdrawal has been rejected." });
+      }
     } catch (error: any) {
-        console.error("Error updating status:", error);
-        toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: error.message || `Could not update the transaction status.`,
-        });
+      console.error("Error updating withdrawal status:", error);
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || `Could not update the transaction status.`,
+      });
     } finally {
-        setUpdatingId(null);
+      setUpdatingId(null);
     }
   }, [toast]);
 
@@ -331,7 +292,7 @@ export default function TransactionsPage() {
             setApprovalItem(item as TransactionProof);
             setApprovalAmount((item as TransactionProof).amount);
         } else if (type === 'withdrawal') {
-            handleUpdateWithdrawalStatus(item.id, item.userId, 'approved');
+            handleUpdateWithdrawalStatus(item.id, 'approved');
         } else if (type === 'application') {
             handleUpdateApplicationStatus(item.id, 'approved');
         }
@@ -372,7 +333,7 @@ export default function TransactionsPage() {
                     if (type === 'deposit') {
                         handleRejectDeposit(item.id);
                     } else if (type === 'withdrawal') {
-                        handleUpdateWithdrawalStatus(item.id, item.userId, 'rejected');
+                        handleUpdateWithdrawalStatus(item.id, 'rejected');
                     } else if (type === 'application') {
                         handleUpdateApplicationStatus(item.id, 'rejected');
                     }

@@ -11,6 +11,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { verifyAdmin } from '@/ai/flows/user-management'; // Import from the central location
+import { TAX_FREE_DAY } from '@/lib/config';
 
 
 // --- Helper to synchronize hasActiveInvestment flag atomically ---
@@ -273,6 +274,99 @@ const approveDepositFlow = ai.defineFlow(
         }
     }
 
+    return { success: true };
+  }
+);
+
+
+// --- Approve Withdrawal ---
+export const ApproveWithdrawalInputSchema = z.object({
+  withdrawalId: z.string(),
+});
+export type ApproveWithdrawalInput = z.infer<typeof ApproveWithdrawalInputSchema>;
+
+export async function approveWithdrawal(input: ApproveWithdrawalInput): Promise<{success: boolean; message: string}> {
+    return approveWithdrawalFlow(input);
+}
+
+const approveWithdrawalFlow = ai.defineFlow(
+  {
+    name: 'approveWithdrawalFlow',
+    inputSchema: ApproveWithdrawalInputSchema,
+    outputSchema: z.object({ success: z.boolean(), message: z.string() }),
+    auth: { user: true, admin: true },
+  },
+  async ({ withdrawalId }, { auth }) => {
+    await verifyAdmin({auth});
+    const db = getFirestore();
+    const withdrawalRef = db.doc(`withdrawalRequests/${withdrawalId}`);
+    
+    const WITHDRAWAL_FEE_RATE = 0.15;
+    const isTaxFreeDay = new Date().getDate() === TAX_FREE_DAY;
+    let finalMessage = '';
+
+    await db.runTransaction(async (transaction) => {
+      const withdrawalDoc = await transaction.get(withdrawalRef);
+      if (!withdrawalDoc.exists || withdrawalDoc.data()?.status !== 'pending') {
+        throw new Error("Withdrawal request not found or already processed.");
+      }
+      
+      const { userId, amount: requestedAmount } = withdrawalDoc.data()!;
+      const userStatsRef = db.doc(`userStats/${userId}`);
+      const userStatsDoc = await transaction.get(userStatsRef);
+      const currentBalance = userStatsDoc.exists() ? userStatsDoc.data()?.availableBalance || 0 : 0;
+
+      if (currentBalance < requestedAmount) {
+        throw new Error("User has insufficient funds for this withdrawal.");
+      }
+
+      const serviceFee = isTaxFreeDay ? 0 : requestedAmount * WITHDRAWAL_FEE_RATE;
+      
+      transaction.update(userStatsRef, {
+        availableBalance: FieldValue.increment(-requestedAmount),
+        withdrawalAmount: FieldValue.increment(requestedAmount),
+      });
+
+      transaction.update(withdrawalRef, {
+        status: 'approved',
+        serviceFee: serviceFee,
+      });
+
+      finalMessage = `Withdrawal has been approved. ${isTaxFreeDay ? 'No service fee was charged.' : ''}`;
+    });
+
+    return { success: true, message: finalMessage };
+  }
+);
+
+// --- Reject Withdrawal ---
+export const RejectWithdrawalInputSchema = z.object({
+  withdrawalId: z.string(),
+});
+export type RejectWithdrawalInput = z.infer<typeof RejectWithdrawalInputSchema>;
+
+export async function rejectWithdrawal(input: RejectWithdrawalInput): Promise<{success: boolean}> {
+    return rejectWithdrawalFlow(input);
+}
+
+const rejectWithdrawalFlow = ai.defineFlow(
+  {
+    name: 'rejectWithdrawalFlow',
+    inputSchema: RejectWithdrawalInputSchema,
+    outputSchema: z.object({ success: z.boolean() }),
+    auth: { user: true, admin: true },
+  },
+  async ({ withdrawalId }, { auth }) => {
+    await verifyAdmin({ auth });
+    const db = getFirestore();
+    const withdrawalRef = db.doc(`withdrawalRequests/${withdrawalId}`);
+
+    const withdrawalDoc = await withdrawalRef.get();
+    if (!withdrawalDoc.exists || withdrawalDoc.data()?.status !== 'pending') {
+        throw new Error("Withdrawal request not found or already processed.");
+    }
+    
+    await withdrawalRef.update({ status: 'rejected' });
     return { success: true };
   }
 );
