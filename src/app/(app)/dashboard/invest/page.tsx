@@ -16,11 +16,16 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
+<<<<<<< HEAD
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { investPackage } from "@/ai/flows/user-management";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+=======
+import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
+import { investPackage } from "@/ai/flows/user-management";
+>>>>>>> refs/remotes/origin/main
 
 interface InvestmentPackage {
   id: string;
@@ -62,6 +67,7 @@ export default function InvestPage() {
     setIsInvesting(pkg.id);
 
     try {
+<<<<<<< HEAD
       await investPackage({ packageId: pkg.id });
 
       toast({
@@ -69,6 +75,20 @@ export default function InvestPage() {
         description: `You have invested in ${pkg.name}.`,
       });
 
+=======
+      // Call the secure backend flow
+      const result = await investPackage({ packageId: pkg.id });
+
+      if (result.success) {
+        toast({
+            title: "Investment Successful!",
+            description: `You have invested in ${pkg.name}.`,
+        });
+      } else {
+        throw new Error("The investment could not be completed.");
+      }
+
+>>>>>>> refs/remotes/origin/main
     } catch (error: any) {
         if (error.message.includes("Insufficient funds")) {
             toast({
@@ -141,9 +161,31 @@ export default function InvestPage() {
                  <div className="w-full text-center text-sm font-semibold text-primary group-hover:text-primary/80 transition-colors">
                   {isInvesting === pkg.id ? <Loader2 className="animate-spin mx-auto" /> : "Invest Now"}
                 </div>
+<<<<<<< HEAD
               </CardFooter>
             </Card>
           </button>
+=======
+                 <div className="flex justify-between items-baseline">
+                    <span className="text-muted-foreground">Duration</span>
+                    <span className="font-semibold">{pkg.duration} Days</span>
+                </div>
+                 <div className="flex justify-between items-baseline">
+                    <span className="text-muted-foreground">Total Earnings</span>
+                    <span className="font-bold text-accent">{formatCurrency(pkg.totalReturn)}</span>
+                </div>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                className="w-full bg-foreground text-background hover:bg-foreground/90"
+                onClick={() => handleInvestment(pkg)}
+                disabled={isLoadingBalance || isInvesting === pkg.id || userBalance < pkg.price}
+              >
+                {isInvesting === pkg.id ? <Loader2 className="animate-spin" /> : "Invest Now"}
+              </Button>
+            </CardFooter>
+          </Card>
+>>>>>>> refs/remotes/origin/main
         ))}
       </div>
 

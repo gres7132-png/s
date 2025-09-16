@@ -76,10 +76,18 @@ const ContributorApplicationInputSchema = z.object({
 });
 type ContributorApplicationInput = z.infer<typeof ContributorApplicationInputSchema>;
 
+<<<<<<< HEAD
 const InvestPackageInputSchema = z.object({
     packageId: z.string().describe("The ID of the investment package to purchase."),
 });
 export type InvestPackageInput = z.infer<typeof InvestPackageInputSchema>;
+=======
+
+const InvestPackageInputSchema = z.object({
+  packageId: z.string(),
+});
+type InvestPackageInput = z.infer<typeof InvestPackageInputSchema>;
+>>>>>>> refs/remotes/origin/main
 
 
 /**
@@ -153,8 +161,12 @@ async function processReferral({ investorId, investmentAmount }: { investorId: s
       return { success: true, commissionAwarded: commissionAmount };
     } catch (error) {
        console.error(`Failed to award commission to ${referrerId}:`, error);
+<<<<<<< HEAD
        // We don't re-throw here to ensure the main investment isn't rolled back if this fails.
        return { success: false, commissionAwarded: 0 };
+=======
+       throw new Error("Failed to award commission.");
+>>>>>>> refs/remotes/origin/main
     }
 }
 
@@ -315,6 +327,7 @@ const applyForContributorTierFlow = ai.defineFlow(
   }
 );
 
+<<<<<<< HEAD
 /**
  * Wrapper for investPackageFlow.
  */
@@ -383,4 +396,87 @@ const investPackageFlow = ai.defineFlow(
 
     return { success: true };
   }
+=======
+
+/**
+ * Wrapper for investPackageFlow
+ */
+export async function investPackage(input: InvestPackageInput): Promise<{ success: boolean; investmentId: string }> {
+    return investPackageFlow(input);
+}
+
+
+/**
+ * SECURE: Handles the entire investment process for a user.
+ */
+const investPackageFlow = ai.defineFlow(
+    {
+        name: 'investPackageFlow',
+        inputSchema: InvestPackageInputSchema,
+        outputSchema: z.object({ success: z.boolean(), investmentId: z.string() }),
+        auth: { user: true }
+    },
+    async ({ packageId }, { auth }) => {
+        if (!auth) throw new Error("Authentication required.");
+        const userId = auth.uid;
+        const db = getFirestore();
+
+        const userStatsDocRef = db.doc(`userStats/${userId}`);
+        const userDocRef = db.doc(`users/${userId}`);
+        const packageDocRef = db.doc(`silverLevelPackages/${packageId}`);
+
+        let investmentId = '';
+
+        await db.runTransaction(async (transaction) => {
+            const userStatsDoc = await transaction.get(userStatsDocRef);
+            const userDoc = await transaction.get(userDocRef);
+            const packageDoc = await transaction.get(packageDocRef);
+
+            if (!packageDoc.exists) {
+                throw new Error("The selected investment package does not exist.");
+            }
+            const pkg = packageDoc.data()!;
+
+            const currentBalance = userStatsDoc.exists() ? userStatsDoc.data()!.availableBalance : 0;
+            if (currentBalance < pkg.price) {
+                throw new Error("Insufficient funds to make this investment.");
+            }
+
+            // 1. Deduct price from balance
+            transaction.update(userStatsDocRef, { availableBalance: FieldValue.increment(-pkg.price) });
+
+            // 2. Create the new investment document
+            const investmentDocRef = db.collection("users", userId, "investments").doc();
+            transaction.set(investmentDocRef, {
+                name: pkg.name,
+                price: pkg.price,
+                dailyReturn: pkg.dailyReturn,
+                duration: pkg.duration,
+                totalReturn: pkg.totalReturn,
+                startDate: FieldValue.serverTimestamp(),
+                status: "active",
+            });
+            investmentId = investmentDocRef.id;
+
+            // 3. Set hasActiveInvestment to true on the user document if it's not already set
+            if (!userDoc.exists() || !userDoc.data()?.hasActiveInvestment) {
+                 transaction.set(userDocRef, { hasActiveInvestment: true }, { merge: true });
+            }
+        });
+
+        // 4. After successful transaction, process the referral commission.
+        // This is done outside the transaction to avoid contention, as it updates another user's document.
+        const pkgData = (await packageDocRef.get()).data();
+        if (pkgData) {
+            try {
+                await processReferral({ investorId: userId, investmentAmount: pkgData.price });
+            } catch (referralError: any) {
+                // Log the error but don't fail the entire investment operation
+                console.error("Non-critical error: Referral processing failed after investment:", referralError.message);
+            }
+        }
+
+        return { success: true, investmentId };
+    }
+>>>>>>> refs/remotes/origin/main
 );
