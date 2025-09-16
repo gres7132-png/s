@@ -77,7 +77,7 @@ async function calculateAndCreditEarnings(): Promise<CalculateEarningsOutput> {
     console.log(`Reset complete for ${docsToResetRefs.length} users.`);
 
 
-    // --- STEP 3: Calculate and credit new earnings using a transaction for safety ---
+    // --- STEP 3: Calculate and credit new earnings using a batch write ---
     const creditBatch = db.batch();
     let totalCredited = 0;
 
